@@ -1,0 +1,32 @@
+[
+    {
+        "id": "cornrows",
+        "title": "Cornrows",
+        "description": "Un estilo clásico, pegado al cuero cabelludo, diseñado para durar semanas manteniendo un acabado impecable.",
+        "duration": "2 a 4 horas"
+    },
+    {
+        "id": "boxer",
+        "title": "Boxeadoras",
+        "description": "Dos trenzas firmes, simétricas y elegantes. Ideales para el día a día o eventos deportivos con estilo.",
+        "duration": "1.5 a 2.5 horas"
+    },
+    {
+        "id": "dutch",
+        "title": "Holandesas",
+        "description": "Trenzas con relieve que aportan volumen y un aire romántico. Perfectas para ocasiones especiales.",
+        "duration": "1.5 a 3 horas"
+    },
+    {
+        "id": "twist",
+        "title": "Twist",
+        "description": "Textura y volumen único mediante la técnica de torsión. Un look moderno y versátil.",
+        "duration": "2 a 5 horas"
+    },
+    {
+        "id": "custom",
+        "title": "Diseños Personalizados",
+        "description": "Creamos lo que imagines: patrones geométricos, combinaciones de colores y estilos híbridos.",
+        "duration": "Según diseño"
+    }
+]
