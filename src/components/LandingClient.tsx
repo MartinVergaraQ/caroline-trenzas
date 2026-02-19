@@ -5,7 +5,6 @@ import WhatsAppLeadForm from "@/components/WhatsAppLeadForm";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-
 export default function LandingClient() {
     const [open, setOpen] = useState(false);
 
@@ -77,38 +76,45 @@ export default function LandingClient() {
             <main className="pt-20">
                 {/* HERO */}
                 <section className="px-6 lg:px-40 py-10">
-                    <div
-                        className="relative w-full min-h-[500px] lg:min-h-[600px] rounded-xl overflow-hidden flex items-center justify-start p-8 lg:p-20 bg-cover bg-center"
-                        style={{
-                            backgroundImage:
-                                "linear-gradient(to right, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 100%), url('https://lh3.googleusercontent.com/aida-public/AB6AXuCy9DUi6lA5ZHHte8ccfLdh4e_v_youhN1lWUWRqvze1PmDzputL9PRIuvkWX7yTkt-YLDAUSaV2uEZgot5tugnqaVFkhTLGlB3FeLQJtuH-PHT861-PSfj2f89Kkx3EnhZ3hiKQu9zsmAe34HKRC7cpskyunvK8VP5Cg1Icuv_O_apE9oEkVVdGved3sGo6BUKyE4fmRvFxsCuY7xRen31FMTKbX1eVq1Li4CgNe_gP0iixvezHHzor_7ppYaauqY46-eOQTV583Q5')",
-                        }}
-                    >
-                        <div className="max-w-2xl text-white space-y-6">
-                            <span className="inline-block bg-primary/90 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest">
-                                Servicio Profesional
-                            </span>
-                            <h1 className="text-4xl lg:text-6xl font-black leading-tight tracking-tight">
-                                Trenzas a domicilio en San Bernardo
-                            </h1>
-                            <p className="text-lg lg:text-xl font-medium opacity-90">
-                                Fines de semana disponibles. Luce un estilo único y duradero sin salir de casa.
-                            </p>
-                            <div className="flex flex-wrap gap-4 pt-4">
-                                <button
-                                    onClick={() => setOpen(true)}
-                                    className="flex items-center justify-center rounded-full h-14 px-8 bg-primary text-white text-base font-bold shadow-xl md:hover:scale-105 transition-transform"
-                                    type="button"
-                                >
-                                    Cotizar por WhatsApp
-                                </button>
+                    <div className="relative w-full min-h-[500px] lg:min-h-[600px] rounded-[48px] overflow-hidden">
+                        <Image
+                            src="/hero.jpg"
+                            alt="Caroline Trenzas"
+                            fill
+                            priority
+                            className="object-cover"
+                            style={{ objectPosition: "60% 35%" }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/35 to-black/15" />
 
-                                <a
-                                    className="flex items-center justify-center rounded-full h-14 px-8 bg-white/20 backdrop-blur-sm text-white text-base font-bold border border-white/30 hover:bg-white/30 transition-all"
-                                    href="#galeria"
-                                >
-                                    Ver catálogo
-                                </a>
+                        <div className="relative z-10 flex min-h-[500px] lg:min-h-[600px] items-center p-8 lg:p-20">
+                            <div className="max-w-2xl text-white space-y-6">
+                                <span className="inline-block bg-primary/90 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest">
+                                    Servicio Profesional
+                                </span>
+                                <h1 className="text-4xl lg:text-6xl font-black leading-tight tracking-tight">
+                                    Trenzas a domicilio en San Bernardo
+                                </h1>
+                                <p className="text-lg lg:text-xl font-medium opacity-90">
+                                    Fines de semana disponibles. Luce un estilo único y duradero sin salir de casa.
+                                </p>
+
+                                <div className="flex flex-wrap gap-4 pt-4">
+                                    <button
+                                        onClick={() => setOpen(true)}
+                                        className="flex items-center justify-center rounded-full h-14 px-8 bg-primary text-white text-base font-bold shadow-xl md:hover:scale-105 transition-transform"
+                                        type="button"
+                                    >
+                                        Cotizar por WhatsApp
+                                    </button>
+
+                                    <a
+                                        className="flex items-center justify-center rounded-full h-14 px-8 bg-white/20 backdrop-blur-sm text-white text-base font-bold border border-white/30 hover:bg-white/30 transition-all"
+                                        href="#galeria"
+                                    >
+                                        Ver catálogo
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>

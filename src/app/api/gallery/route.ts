@@ -9,16 +9,17 @@ cloudinary.config({
 
 export async function GET() {
     const res = await cloudinary.search
-        .expression("folder:caroline/galeria")
+        .expression("tags:gallery")
         .sort_by("created_at", "desc")
         .max_results(60)
         .execute();
 
     const images = (res.resources || []).map((r: any) => ({
         src: r.secure_url,
-        alt: r.public_id.split("/").pop() || "Galería",
-        width: r.width,
-        height: r.height,
+        alt: "Trabajo de trenzas",
+        width: r.width || 1200,
+        height: r.height || 1600,
+        publicId: r.public_id,
     }));
 
     return NextResponse.json({ images });

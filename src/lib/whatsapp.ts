@@ -7,20 +7,39 @@ type Lead = {
     mensaje?: string;
 };
 
-export const WHATSAPP_PHONE = "56974011961"; // sin + para wa.me
+export const WHATSAPP_PHONE = "56974011961"; // sin +
+
+function clean(s: string) {
+    return s
+        .replace(/\u00A0/g, " ")                 // NBSP
+        .replace(/[\u200B-\u200D\uFEFF]/g, "")   // zero-width + BOM
+        .trim();
+}
+
+export function buildWhatsAppText(data?: Lead) {
+    const lines: string[] = [];
+
+    // 1ra línea sin emoji (más estable en IG iOS)
+    lines.push("Hola Caroline");
+
+    // 2da línea con emoji
+    lines.push("👋");
+
+    if (data?.nombre) lines.push(`Soy ${clean(data.nombre)}.`);
+    if (data?.servicio) lines.push(`Servicio: ${clean(data.servicio)}`);
+    if (data?.fecha) lines.push(`Fecha: ${clean(data.fecha)}`);
+    if (data?.hora) lines.push(`Hora: ${clean(data.hora)}`);
+    if (data?.comuna) lines.push(`Comuna: ${clean(data.comuna)}`);
+    if (data?.mensaje) lines.push(`Detalle: ${clean(data.mensaje)}`);
+
+    lines.push("Enviado desde la web");
+
+    return lines.join("\r\n");
+}
+
 
 export function buildWhatsAppUrl(data?: Lead) {
-    const lines: string[] = ["Hola Caroline 👋"];
-
-    if (data?.nombre) lines.push(`Soy ${data.nombre}.`);
-    if (data?.servicio) lines.push(`Servicio: ${data.servicio}`);
-    if (data?.fecha) lines.push(`Fecha: ${data.fecha}`);
-    if (data?.hora) lines.push(`Hora: ${data.hora}`);
-    if (data?.comuna) lines.push(`Comuna: ${data.comuna}`);
-    if (data?.mensaje) lines.push(`Detalle: ${data.mensaje}`);
-
-    lines.push("(Enviado desde la web)");
-
-    const text = encodeURIComponent(lines.join("\n"));
-    return `https://wa.me/${WHATSAPP_PHONE}?text=${text}`;
+    const text = encodeURIComponent(buildWhatsAppText(data));
+    // api.whatsapp.com suele funcionar mejor que wa.me en in-app browsers
+    return `https://api.whatsapp.com/send?phone=${WHATSAPP_PHONE}&text=${text}`;
 }

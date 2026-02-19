@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
 import servicesMeta from "@/data/services.json";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
     api_key: process.env.CLOUDINARY_API_KEY!,
@@ -9,34 +12,26 @@ cloudinary.config({
 });
 
 export async function GET() {
-    try {
-        const services = await Promise.all(
-            (servicesMeta as any[]).map(async (s) => {
-                // Buscamos 1 imagen (la más reciente) marcada con el tag del servicio
-                // y en el folder correcto.
-                const tag = `service_${String(s.id).toLowerCase()}`;
+    const res = await cloudinary.search
+        .expression("tags:services")
+        .with_field("tags") // 🔥 importante
+        .sort_by("created_at", "desc")
+        .max_results(200)
+        .execute();
 
-                const res = await cloudinary.search
-                    .expression(`folder:caroline/servicios AND tags=${tag}`)
-                    .sort_by("created_at", "desc")
-                    .max_results(1)
-                    .execute();
+    const resources = res.resources || [];
 
-                const first = res?.resources?.[0];
+    const services = (servicesMeta as any[]).map((s) => {
+        const id = String(s.id).toLowerCase();
+        const requiredTag = `service_${id}`;
 
-                return {
-                    ...s,
-                    image: first?.secure_url || "",
-                };
-            })
-        );
+        const match = resources.find((r: any) => (r.tags || []).includes(requiredTag));
 
-        return NextResponse.json({ services });
-    } catch (err: any) {
-        console.error("API /services error:", err);
-        return NextResponse.json(
-            { services: [], error: err?.message || "Cloudinary error" },
-            { status: 500 }
-        );
-    }
+        return { ...s, image: match?.secure_url || "" };
+    });
+
+    return NextResponse.json(
+        { services },
+        { headers: { "Cache-Control": "no-store, max-age=0" } }
+    );
 }
