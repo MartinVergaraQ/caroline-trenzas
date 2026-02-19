@@ -19,12 +19,7 @@ export const metadata: Metadata = {
     url: "https://caroline-trenzas.vercel.app",
     siteName: "Caroline Trenzas",
     images: [
-      {
-        url: "https://lh3.googleusercontent.com/aida-public/AB6AXuCy9DUi6lA5ZHHte8ccfLdh4e_v_youhN1lWUWRqvze1PmDzputL9PRIuvkWX7yTkt-YLDAUSaV2uEZgot5tugnqaVFkhTLGlB3FeLQJtuH-PHT861-PSfj2f89Kkx3EnhZ3hiKQu9zsmAe34HKRC7cpskyunvK8VP5Cg1Icuv_O_apE9oEkVVdGved3sGo6BUKyE4fmRvFxsCuY7xRen31FMTKbX1eVq1Li4CgNe_gP0iixvezHHzor_7ppYaauqY46-eOQTV583Q5",
-        width: 1200,
-        height: 630,
-        alt: "Caroline Trenzas",
-      },
+      { url: "/og.jpg", width: 1200, height: 630, alt: "Caroline Trenzas" },
     ],
     locale: "es_CL",
     type: "website",
@@ -33,9 +28,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Caroline Trenzas",
     description: "Trenzas y peinados profesionales a domicilio en San Bernardo.",
-    images: [
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuCy9DUi6lA5ZHHte8ccfLdh4e_v_youhN1lWUWRqvze1PmDzputL9PRIuvkWX7yTkt-YLDAUSaV2uEZgot5tugnqaVFkhTLGlB3FeLQJtuH-PHT861-PSfj2f89Kkx3EnhZ3hiKQu9zsmAe34HKRC7cpskyunvK8VP5Cg1Icuv_O_apE9oEkVVdGved3sGo6BUKyE4fmRvFxsCuY7xRen31FMTKbX1eVq1Li4CgNe_gP0iixvezHHzor_7ppYaauqY46-eOQTV583Q5",
-    ],
+    images: ["/og.jpg"],
   },
 };
 
