@@ -5,16 +5,43 @@ import WhatsAppLeadForm from "@/components/WhatsAppLeadForm";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
+type GalleryItem = {
+    publicId: string;
+    src: string;
+    createdAt?: string;
+    mediaType: "image" | "video";
+    alt?: string;
+    width?: number;
+    height?: number;
+    tags?: string[];
+};
+
 export default function LandingClient() {
     const [open, setOpen] = useState(false);
 
-    const [gallery, setGallery] = useState<{ src: string; alt: string; width: number; height: number }[]>([]);
+    const [gallery, setGallery] = useState<GalleryItem[]>([]);
+    const [reels, setReels] = useState<GalleryItem[]>([]);
 
     useEffect(() => {
-        fetch("/api/gallery")
+        fetch("/api/gallery", { cache: "no-store" })
             .then((r) => r.json())
-            .then((data) => setGallery(data.images || []))
-            .catch(() => setGallery([]));
+            .then((data) => {
+                const items = (data.items || []).map((x: any) => ({
+                    ...x,
+                    mediaType: x.mediaType === "video" ? "video" : "image",
+                }));
+                const reels = (data.reels || []).map((x: any) => ({
+                    ...x,
+                    mediaType: "video",
+                }));
+
+                setGallery(items);
+                setReels(reels);
+            })
+            .catch(() => {
+                setGallery([]);
+                setReels([]);
+            });
     }, []);
 
     const [services, setServices] = useState<
@@ -22,7 +49,7 @@ export default function LandingClient() {
     >([]);
 
     useEffect(() => {
-        fetch("/api/services")
+        fetch("/api/services", { cache: "no-store" })
             .then((r) => r.json())
             .then((data) => setServices(data.services || []))
             .catch(() => setServices([]));
@@ -334,7 +361,6 @@ export default function LandingClient() {
                 </section>
 
                 {/* Gallery Section */}
-                {/* Gallery Section */}
                 <section id="galeria" className="scroll-mt-24 px-6 lg:px-40 py-20 bg-white">
                     <div className="max-w-[1200px] mx-auto">
                         <div className="text-center mb-12">
@@ -342,25 +368,91 @@ export default function LandingClient() {
                             <p className="text-[#89616f]">Resultados reales de nuestras clientas satisfechas.</p>
                         </div>
 
-                        {gallery.length === 0 ? (
+                        {/* --- REELS / VIDEOS DESTACADOS --- */}
+                        {reels?.length ? (
+                            <div className="mb-14">
+                                <div className="flex items-end justify-between gap-3 mb-5">
+                                    <div>
+                                        <h3 className="text-xl font-black text-[#181113]">Reels / Videos</h3>
+                                        <p className="text-sm text-[#89616f]">
+                                            Movimiento real. Brillo real. Decisión de compra más rápida.
+                                        </p>
+                                    </div>
+                                    <span className="text-xs font-bold text-[#89616f]">{reels.length} videos</span>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                    {reels.slice(0, 6).map((v) => (
+                                        <div key={v.publicId || v.src} className="group rounded-2xl border bg-background-light overflow-hidden hover:shadow-xl transition-all">
+                                            <div className="relative aspect-[9/16] bg-black">
+                                                <video
+                                                    src={v.src}
+                                                    controls
+                                                    playsInline
+                                                    preload="metadata"
+                                                    className="h-full w-full object-cover"
+                                                />
+                                            </div>
+                                            <div className="p-4 flex items-center justify-between">
+                                                <p className="text-xs text-[#89616f] truncate max-w-[70%]">{v.publicId || "Video"}</p>
+                                                <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-black/80 text-white">VIDEO</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {/* --- GALERÍA COMPLETA (MIXTA) --- */}
+                        {gallery?.length === 0 ? (
                             <div className="rounded-xl border border-primary/10 bg-background-light p-10 text-center">
-                                <p className="text-[#89616f]">
-                                    Pronto subiremos fotos reales de nuestros trabajos.
-                                </p>
+                                <p className="text-[#89616f]">Pronto subiremos fotos reales de nuestros trabajos.</p>
                             </div>
                         ) : (
-                            <div className="masonry">
-                                {gallery.map((img) => (
-                                    <div key={img.src} className="masonry-item">
-                                        <Image
-                                            src={img.src}
-                                            alt={img.alt || "Trabajo de trenzas"}
-                                            width={img.width || 1200}
-                                            height={img.height || 1600}
-                                            className="w-full h-auto rounded-xl"
-                                        />
+                            <div>
+                                <div className="flex items-end justify-between gap-3 mb-5">
+                                    <div>
+                                        <h3 className="text-xl font-black text-[#181113]">Galería completa</h3>
+                                        <p className="text-sm text-[#89616f]">Fotos y videos, todo junto.</p>
                                     </div>
-                                ))}
+                                    <span className="text-xs font-bold text-[#89616f]">{gallery.length} items</span>
+                                </div>
+
+                                <div className="masonry">
+                                    {gallery.map((item) => (
+                                        <div key={item.publicId || item.src} className="masonry-item">
+                                            {item.mediaType === "video" ? (
+                                                <div className="relative rounded-xl overflow-hidden border bg-black">
+                                                    <div className="relative w-full aspect-[9/16] bg-black">
+                                                        <video
+                                                            src={item.src}
+                                                            controls={false}
+                                                            muted
+                                                            autoPlay
+                                                            loop
+                                                            playsInline
+                                                            preload="metadata"
+
+                                                            poster={item.src.replace("/upload/", "/upload/so_0/").replace(/\.\w+$/, ".jpg")}
+                                                            className="absolute inset-0 h-full w-full object-cover"
+                                                        />
+                                                    </div>
+                                                    <div className="absolute left-3 top-3 text-[11px] font-bold px-2 py-1 rounded-full bg-white/90 text-black">
+                                                        VIDEO
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <Image
+                                                    src={item.src}
+                                                    alt={item.alt || "Trabajo de trenzas"}
+                                                    width={item.width || 1200}
+                                                    height={item.height || 1600}
+                                                    className="w-full h-auto rounded-xl"
+                                                />
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>

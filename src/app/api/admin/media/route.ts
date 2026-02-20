@@ -3,6 +3,7 @@ import { v2 as cloudinary } from "cloudinary";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
@@ -22,19 +23,27 @@ export async function GET(req: Request) {
     const type = (searchParams.get("type") || "").toLowerCase();
     const limit = Math.min(Number(searchParams.get("limit") || "30"), 60);
 
-    const assetFolder =
+    const folder =
         type === "gallery"
             ? "caroline/galeria"
             : type === "services"
                 ? "caroline/servicios"
                 : null;
 
-    if (!assetFolder) {
+    if (!folder) {
         return NextResponse.json({ ok: false, message: "type inválido" }, { status: 400 });
     }
 
+    // Galería: images + videos
+    // Servicios: solo images
+    const expression =
+        type === "gallery"
+            ? `(resource_type:image OR resource_type:video) AND folder:${folder}`
+            : `resource_type:image AND folder:${folder}`;
+
     const res = await cloudinary.search
-        .expression(`resource_type:image AND asset_folder="${assetFolder}"`)
+        .expression(expression)
+        .with_field("tags")
         .sort_by("created_at", "desc")
         .max_results(limit)
         .execute();
@@ -46,7 +55,12 @@ export async function GET(req: Request) {
         bytes: r.bytes || 0,
         width: r.width || 0,
         height: r.height || 0,
+        mediaType: r.resource_type as "image" | "video",
+        tags: r.tags || [],
     }));
 
-    return NextResponse.json({ ok: true, images });
+    return NextResponse.json(
+        { ok: true, images },
+        { headers: { "Cache-Control": "no-store, max-age=0" } }
+    );
 }

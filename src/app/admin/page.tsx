@@ -20,6 +20,7 @@ type UploadedItem = {
     publicId: string;
     src: string;
     type: "gallery" | "services";
+    mediaType?: "image" | "video";
     serviceId?: string;
     createdAt?: string; // 👈 lo agregamos para "Hace X min"
 };
@@ -31,6 +32,7 @@ type MediaItem = {
     bytes: number;
     width: number;
     height: number;
+    mediaType?: "image" | "video";
 };
 
 type Notice = null | {
@@ -42,7 +44,8 @@ type Notice = null | {
 type ConfirmDeleteState = null | {
     publicId: string;
     src?: string;
-    contextLabel?: string; // "Galería" o "Servicio: boxer"
+    mediaType?: "image" | "video";
+    contextLabel?: string;
 };
 
 export default function AdminPage() {
@@ -68,6 +71,11 @@ export default function AdminPage() {
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "";
     const presetGallery = process.env.NEXT_PUBLIC_CLOUDINARY_GALLERY_PRESET || "";
     const presetServices = process.env.NEXT_PUBLIC_CLOUDINARY_SERVICES_PRESET || "";
+    const presetGalleryVideo = process.env.NEXT_PUBLIC_CLOUDINARY_GALLERY_VIDEO_PRESET || "";
+
+    const galleryVideos = galleryLatest.filter(x => (x.mediaType ?? "image") === "video").length;
+    const galleryImages = galleryLatest.length - galleryVideos;
+
 
     const selectedTitle = useMemo(
         () => SERVICES.find((x) => x.id === selectedServiceId)?.title || "Servicio",
@@ -150,7 +158,11 @@ export default function AdminPage() {
 
         try {
             const [rg, rs] = await Promise.all([
-                fetch("/api/admin/media?type=gallery", { credentials: "include", cache: "no-store" }),
+                fetch("/api/admin/media?type=gallery", {
+                    credentials: "include",
+                    cache: "no-store",
+                    headers: { "Cache-Control": "no-store" },
+                }),
                 fetch("/api/admin/media?type=services", { credentials: "include", cache: "no-store" }),
             ]);
 
@@ -171,7 +183,7 @@ export default function AdminPage() {
         }
     }
 
-    async function deleteByPublicId(publicId: string) {
+    async function deleteByPublicId(publicId: string, resourceType?: "image" | "video") {
         setDeleting(true);
         setNotice(null);
 
@@ -179,7 +191,7 @@ export default function AdminPage() {
             const r = await fetch("/api/admin/delete", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ publicId }),
+                body: JSON.stringify({ publicId, resourceType }),
                 credentials: "include",
                 cache: "no-store",
             });
@@ -207,14 +219,112 @@ export default function AdminPage() {
         }
     }
 
-    function requestDelete(input: { publicId: string; src?: string; contextLabel?: string }) {
+    function requestDelete(input: { publicId: string; src?: string; mediaType?: "image" | "video"; contextLabel?: string }) {
         setConfirmDelete({
             publicId: input.publicId,
             src: input.src,
+            mediaType: input.mediaType,
             contextLabel: input.contextLabel,
         });
     }
+    function openVideoUploader(asReel = false) {
+        setNotice(null);
 
+        if (!cloudName) {
+            setNotice({
+                kind: "error",
+                title: "Faltan variables",
+                detail: "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME no está en .env / Vercel.",
+            });
+            return;
+        }
+
+        if (!presetGalleryVideo) {
+            setNotice({
+                kind: "error",
+                title: "Falta preset de video",
+                detail: "NEXT_PUBLIC_CLOUDINARY_GALLERY_VIDEO_PRESET no está seteado.",
+            });
+            return;
+        }
+
+        if (!window.cloudinary) {
+            setNotice({
+                kind: "error",
+                title: "No cargó el widget",
+                detail: "Revisa que el Script del widget esté en layout.tsx.",
+            });
+            return;
+        }
+
+        const options: any = {
+            cloudName,
+            uploadPreset: presetGalleryVideo,
+            folder: "caroline/galeria",
+
+            multiple: true,
+            maxFiles: 10,
+
+            sources: ["local", "camera", "google_drive"],
+            clientAllowedFormats: ["mp4", "mov", "webm"],
+            cropping: false,
+            showAdvancedOptions: false,
+
+            resourceType: "video",
+
+            showCompletedButton: true,
+            singleUploadAutoClose: false,
+
+            // tags para que /api/gallery lo encuentre
+            tags: asReel ? ["gallery", "video", "reel"] : ["gallery", "video"],
+            context: { album: "gallery", kind: asReel ? "reel" : "video" },
+        };
+
+        const widget = window.cloudinary.createUploadWidget(options, async (error: any, result: any) => {
+            if (error) {
+                console.error("CLOUDINARY VIDEO ERROR:", error);
+                setNotice({
+                    kind: "error",
+                    title: "Error subiendo video",
+                    detail: error?.message || "Mira consola.",
+                });
+                return;
+            }
+
+            if (result?.event === "success") {
+                const info = result.info ?? {};
+                const publicId = String(info.public_id ?? "");
+                const src = String(info.secure_url ?? "");
+                const createdAt = String(info.created_at ?? new Date().toISOString());
+
+                setSessionUploads((prev) => {
+                    const next: UploadedItem[] = [
+                        {
+                            publicId,
+                            src,
+                            type: "gallery",
+                            mediaType: "video",
+                            createdAt,
+                        },
+                        ...prev,
+                    ];
+                    return next.slice(0, 24);
+                });
+
+                setNotice({
+                    kind: "success",
+                    title: asReel ? "Reel subido" : "Video subido",
+                    detail: asReel
+                        ? "Se subió a Galería (destacado)."
+                        : "Se subió a Galería (video).",
+                });
+
+                await refreshLatest();
+            }
+        });
+
+        widget.open();
+    }
     // ---------- uploader ----------
     function openUploader(type: "gallery" | "services") {
         setNotice(null);
@@ -293,18 +403,20 @@ export default function AdminPage() {
                 const src = String(info.secure_url || "");
                 const createdAt = String(info.created_at || new Date().toISOString());
 
-                setSessionUploads((prev) =>
-                    [
+                setSessionUploads((prev) => {
+                    const next: UploadedItem[] = [
                         {
                             publicId,
                             src,
                             type,
+                            mediaType: "image",
                             serviceId: type === "services" ? selectedServiceId : undefined,
                             createdAt,
                         },
                         ...prev,
-                    ].slice(0, 24)
-                );
+                    ];
+                    return next.slice(0, 24);
+                });
 
                 setNotice({
                     kind: "success",
@@ -337,27 +449,47 @@ export default function AdminPage() {
         publicId,
         badge,
         timeAgo,
+        mediaType = "image",
         onDelete,
     }: {
         src: string;
         publicId: string;
         badge: { label: string; cls: string };
         timeAgo?: string;
+        mediaType?: "image" | "video";
         onDelete: () => void;
     }) {
         return (
             <div className="group rounded-2xl border bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                 <div className="relative aspect-square bg-black/5">
-                    <img
-                        src={src}
-                        alt={publicId}
-                        className="h-full w-full object-cover group-hover:scale-[1.02] transition-transform"
-                        loading="lazy"
-                    />
+                    {mediaType === "video" ? (
+                        <video
+                            src={src}
+                            controls
+                            playsInline
+                            preload="metadata"
+                            className="h-full w-full object-cover"
+                        />
+                    ) : (
+                        <img
+                            src={src}
+                            alt={publicId}
+                            className="h-full w-full object-cover group-hover:scale-[1.02] transition-transform"
+                            loading="lazy"
+                        />
+                    )}
 
-                    <div className={`absolute left-2 top-2 text-[11px] font-bold px-2 py-1 rounded-full ${badge.cls}`}>
+                    <div
+                        className={`absolute left-2 top-2 text-[11px] font-bold px-2 py-1 rounded-full ${badge.cls}`}
+                    >
                         {badge.label}
                     </div>
+
+                    {mediaType === "video" ? (
+                        <div className="absolute left-2 bottom-2 text-[11px] font-bold px-2 py-1 rounded-full bg-white/90 text-black">
+                            VIDEO
+                        </div>
+                    ) : null}
 
                     {timeAgo ? (
                         <div className="absolute right-2 top-2 text-[11px] font-bold px-2 py-1 rounded-full bg-white/90 text-black">
@@ -408,7 +540,19 @@ export default function AdminPage() {
                         <div className="p-5">
                             <div className="flex gap-4">
                                 <div className="h-20 w-20 rounded-2xl overflow-hidden bg-black/5 border">
-                                    {state.src ? <img src={state.src} alt={state.publicId} className="h-full w-full object-cover" /> : null}
+                                    {state.src ? (
+                                        state.mediaType === "video" ? (
+                                            <video
+                                                src={state.src}
+                                                className="h-full w-full object-cover"
+                                                controls
+                                                playsInline
+                                                preload="metadata"
+                                            />
+                                        ) : (
+                                            <img src={state.src} alt={state.publicId} className="h-full w-full object-cover" />
+                                        )
+                                    ) : null}
                                 </div>
                                 <div className="min-w-0">
                                     <p className="text-sm font-bold">{state.contextLabel || "Imagen"}</p>
@@ -430,7 +574,7 @@ export default function AdminPage() {
                                     Cancelar
                                 </button>
                                 <button
-                                    onClick={() => deleteByPublicId(state.publicId)}
+                                    onClick={() => deleteByPublicId(state.publicId, state.mediaType)}
                                     disabled={deleting}
                                     className="flex-1 rounded-xl bg-black text-white py-3 text-sm font-bold hover:opacity-90 disabled:opacity-60"
                                 >
@@ -520,6 +664,20 @@ export default function AdminPage() {
                             className="mt-4 w-full rounded-xl bg-primary text-white font-bold py-3"
                         >
                             Subir 1 foto a Galería
+                        </button>
+                        <button
+                            onClick={() => openVideoUploader(false)}
+                            className="mt-3 w-full rounded-xl border py-3 font-bold hover:bg-black/5"
+                        >
+                            🎥 Subir video a Galería
+                        </button>
+
+                        <button
+                            onClick={() => openVideoUploader(true)}
+                            className="mt-2 w-full rounded-xl border py-3 font-bold hover:bg-black/5"
+                            title="Estos aparecen arriba como Reels en la landing"
+                        >
+                            ⭐ Subir Reel (destacado)
                         </button>
                     </div>
 
@@ -617,10 +775,12 @@ export default function AdminPage() {
                                         publicId={img.publicId}
                                         badge={badge}
                                         timeAgo={formatTimeAgo(img.createdAt)}
+                                        mediaType={img.mediaType}
                                         onDelete={() =>
                                             requestDelete({
                                                 publicId: img.publicId,
                                                 src: img.src,
+                                                mediaType: img.mediaType,
                                                 contextLabel: img.type === "gallery" ? "Galería" : `Servicio: ${img.serviceId}`,
                                             })
                                         }
@@ -637,7 +797,9 @@ export default function AdminPage() {
                     <div className="rounded-2xl border p-5">
                         <div className="flex items-center justify-between">
                             <h3 className="font-bold">Últimas en Galería</h3>
-                            <span className="text-xs text-[#89616f]">{galleryLatest.length} fotos</span>
+                            <span className="text-xs text-[#89616f]">
+                                {galleryImages} fotos · {galleryVideos} videos
+                            </span>
                         </div>
 
                         {loadingLatest ? (
@@ -647,13 +809,16 @@ export default function AdminPage() {
                                 ))}
                             </div>
                         ) : galleryLatest.length === 0 ? (
-                            <div className="mt-3 rounded-xl border bg-[#fdfafb] p-4 text-sm text-[#89616f]">No hay fotos todavía.</div>
+                            <div className="mt-3 rounded-xl border bg-[#fdfafb] p-4 text-sm text-[#89616f]">
+                                No hay contenido todavía.
+                            </div>
                         ) : (
                             <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
                                 {galleryLatest.slice(0, 12).map((img) => (
                                     <MediaCard
                                         key={img.publicId}
                                         src={img.src}
+                                        mediaType={img.mediaType}
                                         publicId={img.publicId}
                                         badge={{ label: "Galería", cls: "bg-white/90 text-black" }}
                                         timeAgo={formatTimeAgo(img.createdAt)}
@@ -661,6 +826,7 @@ export default function AdminPage() {
                                             requestDelete({
                                                 publicId: img.publicId,
                                                 src: img.src,
+                                                mediaType: img.mediaType,
                                                 contextLabel: "Galería",
                                             })
                                         }
@@ -694,12 +860,14 @@ export default function AdminPage() {
                                         key={img.publicId}
                                         src={img.src}
                                         publicId={img.publicId}
+                                        mediaType={img.mediaType}
                                         badge={{ label: "Servicios", cls: "bg-black/80 text-white" }}
                                         timeAgo={formatTimeAgo(img.createdAt)}
                                         onDelete={() =>
                                             requestDelete({
                                                 publicId: img.publicId,
                                                 src: img.src,
+                                                mediaType: img.mediaType,
                                                 contextLabel: "Servicios",
                                             })
                                         }
