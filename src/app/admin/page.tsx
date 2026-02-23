@@ -11,8 +11,8 @@ declare global {
 const SERVICES = [
     { id: "cornrows", title: "Cornrows" },
     { id: "boxer", title: "Boxeadoras" },
-    { id: "dutch", title: "Holandesas" },
-    { id: "twist", title: "Twist" },
+    { id: "dutch", title: "Peinados" },
+    { id: "Rulos", title: "Rulos" },
     { id: "custom", title: "Diseños Personalizados" },
 ];
 

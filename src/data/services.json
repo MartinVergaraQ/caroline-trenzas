@@ -13,15 +13,15 @@
     },
     {
         "id": "dutch",
-        "title": "Holandesas",
-        "description": "Trenzas con relieve que aportan volumen y un aire romántico. Perfectas para ocasiones especiales.",
-        "duration": "1.5 a 3 horas"
+        "title": "Peinados",
+        "description": "Peinados a domicilio para ocasiones especiales o el día a día: recogidos, semi-recogidos y estilos personalizados según tu gusto.",
+        "duration": "1 a 2.5 horas"
     },
     {
-        "id": "twist",
-        "title": "Twist",
-        "description": "Textura y volumen único mediante la técnica de torsión. Un look moderno y versátil.",
-        "duration": "2 a 5 horas"
+        "id": "Rulos",
+        "title": "Rulos",
+        "description": "Rizos definidos y con movimiento, creados con técnica de torsión para lograr volumen natural y una textura duradera. Ideal si quieres un cambio con personalidad sin perder versatilidad.",
+        "duration": "1 a 3 horas"
     },
     {
         "id": "custom",
