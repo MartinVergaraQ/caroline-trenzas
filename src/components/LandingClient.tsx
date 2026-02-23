@@ -21,8 +21,14 @@ export default function LandingClient() {
 
     const [gallery, setGallery] = useState<GalleryItem[]>([]);
     const [reels, setReels] = useState<GalleryItem[]>([]);
+    const [loadingGallery, setLoadingGallery] = useState(true);
+    const [loadingServices, setLoadingServices] = useState(true);
+    const [visiblePhotos, setVisiblePhotos] = useState(10);
+    const [openReel, setOpenReel] = useState(false);
+    const [activeReel, setActiveReel] = useState<GalleryItem | null>(null);
 
     useEffect(() => {
+        setLoadingGallery(true);
         fetch("/api/gallery", { cache: "no-store" })
             .then((r) => r.json())
             .then((data) => {
@@ -41,7 +47,8 @@ export default function LandingClient() {
             .catch(() => {
                 setGallery([]);
                 setReels([]);
-            });
+            })
+            .finally(() => setLoadingGallery(false));
     }, []);
 
     const [services, setServices] = useState<
@@ -49,11 +56,20 @@ export default function LandingClient() {
     >([]);
 
     useEffect(() => {
+        setLoadingServices(true);
         fetch("/api/services", { cache: "no-store" })
             .then((r) => r.json())
             .then((data) => setServices(data.services || []))
-            .catch(() => setServices([]));
+            .catch(() => setServices([]))
+            .finally(() => setLoadingServices(false));
     }, []);
+
+    const photos = gallery
+        .filter((x) => x.mediaType !== "video")
+        .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
+    const visible = photos.slice(0, visiblePhotos);
+    const hasMore = visiblePhotos < photos.length;
 
     return (
         <>
@@ -62,11 +78,36 @@ export default function LandingClient() {
                 <WhatsAppLeadForm onSent={() => setOpen(false)} />
             </Modal>
 
+            {/* Modal para Reels */}
+            <Modal
+                open={openReel}
+                onClose={() => {
+                    setOpenReel(false);
+                    setActiveReel(null);
+                }}
+                title="Reel / Video"
+            >
+                {activeReel ? (
+                    <div className="space-y-3">
+                        <div className="relative mx-auto w-full max-w-[360px] aspect-[9/16] max-h-[70vh] overflow-hidden rounded-2xl bg-black">
+                            <video
+                                src={activeReel.src}
+                                controls
+                                playsInline
+                                autoPlay
+                                className="absolute inset-0 h-full w-full object-cover"
+                            />
+                        </div>
+                    </div>
+                ) : null}
+            </Modal>
             {/* Header */}
             <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#f4f0f2] px-6 lg:px-40 py-4">
                 <div className="max-w-[1200px] mx-auto flex items-center justify-between">
-                    <a href="#" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
-                        <div className="text-primary">
+                    <a
+                        href="#inicio"
+                        className="flex items-center gap-3 hover:opacity-90 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 rounded-lg"
+                    >                        <div className="text-primary">
                             <span className="material-symbols-outlined text-3xl">auto_awesome</span>
                         </div>
                         <span className="text-[#181113] text-xl font-extrabold leading-tight tracking-tight font-display">
@@ -139,7 +180,7 @@ export default function LandingClient() {
                                         className="flex items-center justify-center rounded-full h-14 px-8 bg-white/20 backdrop-blur-sm text-white text-base font-bold border border-white/30 hover:bg-white/30 transition-all"
                                         href="#galeria"
                                     >
-                                        Ver catálogo
+                                        Ver trabajos
                                     </a>
                                 </div>
                             </div>
@@ -164,8 +205,7 @@ export default function LandingClient() {
                             {services.map((s) => (
                                 <div
                                     key={s.id}
-                                    className="group bg-background-light p-4 rounded-xl hover:shadow-xl transition-all duration-300 border border-transparent hover:border-primary/10"
-                                >
+                                    className="group bg-background-light p-4 rounded-xl hover:shadow-xl transition-all duration-300 border border-transparent hover:border-primary/10 h-full flex flex-col"                                >
                                     {s.image ? (
                                         <Image
                                             src={s.image}
@@ -180,8 +220,8 @@ export default function LandingClient() {
                                         </div>
                                     )}
 
-                                    <h3 className="text-xl font-bold mb-2">{s.title}</h3>
-                                    <p className="text-[#89616f] text-sm leading-relaxed">{s.description}</p>
+                                    <h3 className="text-xl font-bold mb-2 line-clamp-1">{s.title}</h3>
+                                    <p className="text-[#89616f] text-sm leading-relaxed line-clamp-3">{s.description}</p>
                                 </div>
                             ))}
                         </div>
@@ -375,36 +415,81 @@ export default function LandingClient() {
                                     <div>
                                         <h3 className="text-xl font-black text-[#181113]">Reels / Videos</h3>
                                         <p className="text-sm text-[#89616f]">
-                                            Movimiento real. Brillo real. Decisión de compra más rápida.
+                                            Clips cortos desde Instagram (con marca de agua).
                                         </p>
                                     </div>
                                     <span className="text-xs font-bold text-[#89616f]">{reels.length} videos</span>
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                                    {reels.slice(0, 6).map((v) => (
-                                        <div key={v.publicId || v.src} className="group rounded-2xl border bg-background-light overflow-hidden hover:shadow-xl transition-all">
-                                            <div className="relative aspect-[9/16] bg-black">
-                                                <video
-                                                    src={v.src}
-                                                    controls
-                                                    playsInline
-                                                    preload="metadata"
-                                                    className="h-full w-full object-cover"
-                                                />
-                                            </div>
-                                            <div className="p-4 flex items-center justify-between">
-                                                <p className="text-xs text-[#89616f] truncate max-w-[70%]">{v.publicId || "Video"}</p>
-                                                <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-black/80 text-white">VIDEO</span>
-                                            </div>
-                                        </div>
-                                    ))}
+                                {/* Si hay pocos, que no se vea gigante */}
+                                <div
+                                    className={
+                                        reels.length === 1
+                                            ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
+                                            : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
+                                    }
+                                >
+                                    {reels.slice(0, 6).map((v) => {
+                                        const poster = v.src
+                                            .replace("/upload/", "/upload/so_0/")
+                                            .replace(/\.\w+$/, ".jpg");
+
+                                        return (
+                                            <button
+                                                key={v.publicId || v.src}
+                                                type="button"
+                                                onClick={() => {
+                                                    setActiveReel(v);
+                                                    setOpenReel(true);
+                                                }}
+                                                className="group text-left rounded-2xl border border-primary/10 bg-background-light overflow-hidden hover:shadow-xl transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 flex flex-col h-full" aria-label="Abrir video"
+                                            >
+                                                <div className="relative bg-black h-[360px] sm:h-[420px] lg:h-[460px]">
+                                                    <video
+                                                        src={v.src}
+                                                        muted
+                                                        loop
+                                                        playsInline
+                                                        preload="metadata"
+                                                        poster={poster}
+                                                        className="absolute inset-0 w-full h-full object-cover"
+                                                        // autoplay preview (sin controles)
+                                                        autoPlay
+                                                    />
+
+                                                    {/* Overlay play */}
+                                                    <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                    <div className="absolute left-3 top-3 text-[11px] font-bold px-2 py-1 rounded-full bg-white/90 text-black">
+                                                        REEL
+                                                    </div>
+
+                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                        <div className="size-12 rounded-full bg-black/60 text-white flex items-center justify-center backdrop-blur-sm opacity-90 group-hover:scale-105 transition-transform">
+                                                            <span className="material-symbols-outlined">play_arrow</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Pie limpio, sin filenames */}
+                                                <div className="px-4 py-3 flex items-center justify-between">
+                                                    <p className="text-xs text-[#89616f]">Toca para ver con sonido</p>
+                                                    <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-black/80 text-white">
+                                                        VIDEO
+                                                    </span>
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         ) : null}
 
-                        {/* --- GALERÍA COMPLETA (MIXTA) --- */}
-                        {gallery?.length === 0 ? (
+                        {/* --- GALERÍA (SOLO FOTOS) --- */}
+                        {loadingGallery ? (
+                            <div className="rounded-xl border border-primary/10 bg-background-light p-10 text-center">
+                                <p className="text-[#89616f]">Cargando galería…</p>
+                            </div>
+                        ) : photos.length === 0 ? (
                             <div className="rounded-xl border border-primary/10 bg-background-light p-10 text-center">
                                 <p className="text-[#89616f]">Pronto subiremos fotos reales de nuestros trabajos.</p>
                             </div>
@@ -412,47 +497,50 @@ export default function LandingClient() {
                             <div>
                                 <div className="flex items-end justify-between gap-3 mb-5">
                                     <div>
-                                        <h3 className="text-xl font-black text-[#181113]">Galería completa</h3>
-                                        <p className="text-sm text-[#89616f]">Fotos y videos, todo junto.</p>
+                                        <h3 className="text-xl font-black text-[#181113]">Galería de fotos</h3>
+                                        <p className="text-sm text-[#89616f]">Algunos resultados reales (sin filtros raros).</p>
                                     </div>
-                                    <span className="text-xs font-bold text-[#89616f]">{gallery.length} items</span>
+                                    <span className="text-xs font-bold text-[#89616f]">
+                                        {Math.min(visiblePhotos, photos.length)} / {photos.length}
+                                    </span>
                                 </div>
 
                                 <div className="masonry">
-                                    {gallery.map((item) => (
+                                    {visible.map((item) => (
                                         <div key={item.publicId || item.src} className="masonry-item">
-                                            {item.mediaType === "video" ? (
-                                                <div className="relative rounded-xl overflow-hidden border bg-black">
-                                                    <div className="relative w-full aspect-[9/16] bg-black">
-                                                        <video
-                                                            src={item.src}
-                                                            controls={false}
-                                                            muted
-                                                            autoPlay
-                                                            loop
-                                                            playsInline
-                                                            preload="metadata"
-
-                                                            poster={item.src.replace("/upload/", "/upload/so_0/").replace(/\.\w+$/, ".jpg")}
-                                                            className="absolute inset-0 h-full w-full object-cover"
-                                                        />
-                                                    </div>
-                                                    <div className="absolute left-3 top-3 text-[11px] font-bold px-2 py-1 rounded-full bg-white/90 text-black">
-                                                        VIDEO
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <Image
-                                                    src={item.src}
-                                                    alt={item.alt || "Trabajo de trenzas"}
-                                                    width={item.width || 1200}
-                                                    height={item.height || 1600}
-                                                    className="w-full h-auto rounded-xl"
-                                                />
-                                            )}
+                                            <Image
+                                                src={item.src}
+                                                alt={item.alt || "Trabajo de trenzas"}
+                                                width={item.width || 1200}
+                                                height={item.height || 1600}
+                                                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                                className="w-full h-auto rounded-xl"
+                                                loading="lazy"
+                                            />
                                         </div>
                                     ))}
                                 </div>
+
+                                {/* Cargar más */}
+                                {hasMore ? (
+                                    <div className="mt-10 flex flex-col items-center gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setVisiblePhotos((v) => v + 10)}
+                                            className="h-12 px-7 rounded-full bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 active:scale-[0.99] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                                        >
+                                            Cargar más fotos
+                                        </button>
+
+                                        <p className="text-xs text-[#89616f]">
+                                            Mostrando {Math.min(visiblePhotos, photos.length)} de {photos.length}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="mt-10 text-center text-xs text-[#89616f]">
+                                        Eso es todo. Si quieres más, toca el botón de WhatsApp y te mandan el IG 😄
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
