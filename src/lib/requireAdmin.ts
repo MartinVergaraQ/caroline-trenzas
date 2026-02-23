@@ -10,19 +10,17 @@ function readCookie(req: Request, name: string) {
     return found ? decodeURIComponent(found.split("=").slice(1).join("=")) : null;
 }
 
-export async function POST(req: Request) {
+export async function requireAdmin(req: Request) {
     const token = readCookie(req, ADMIN_COOKIE);
-    if (token) {
-        await redis.del(sessionKey(token));
+
+    if (!token) {
+        return { ok: false as const, res: NextResponse.json({ ok: false }, { status: 401 }) };
     }
 
-    const res = NextResponse.json({ ok: true });
-    res.cookies.set(ADMIN_COOKIE, "", {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        maxAge: 0,
-    });
-    return res;
+    const s = (await redis.get(sessionKey(token))) as string | null;
+    if (!s) {
+        return { ok: false as const, res: NextResponse.json({ ok: false }, { status: 401 }) };
+    }
+
+    return { ok: true as const };
 }

@@ -9,6 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@simplewebauthn/browser": "^13.2.2",
+    "@simplewebauthn/server": "^13.2.3",
+    "@upstash/redis": "^1.36.2",
     "cloudinary": "^2.9.0",
     "next": "16.1.6",
     "react": "19.2.3",

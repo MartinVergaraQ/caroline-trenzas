@@ -20,10 +20,7 @@ export function buildWhatsAppText(data?: Lead) {
     const lines: string[] = [];
 
     // 1ra línea sin emoji (más estable en IG iOS)
-    lines.push("Hola Caroline");
-
-    // 2da línea con emoji
-    lines.push("👋");
+    lines.push("Hola Caroline 👋");
 
     if (data?.nombre) lines.push(`Soy ${clean(data.nombre)}.`);
     if (data?.servicio) lines.push(`Servicio: ${clean(data.servicio)}`);
@@ -32,9 +29,7 @@ export function buildWhatsAppText(data?: Lead) {
     if (data?.comuna) lines.push(`Comuna: ${clean(data.comuna)}`);
     if (data?.mensaje) lines.push(`Detalle: ${clean(data.mensaje)}`);
 
-    lines.push("Enviado desde la web");
-
-    return lines.join("\r\n");
+    return lines.join("\n");
 }
 
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 
 declare global {
     interface Window {
@@ -75,7 +76,61 @@ export default function AdminPage() {
 
     const galleryVideos = galleryLatest.filter(x => (x.mediaType ?? "image") === "video").length;
     const galleryImages = galleryLatest.length - galleryVideos;
+    const [loadingLogin, setLoadingLogin] = useState(false);
+    const [showPwd, setShowPwd] = useState(false);
+    const [canPasskey, setCanPasskey] = useState<boolean | null>(null);
+    const [loadingPasskey, setLoadingPasskey] = useState(false);
+    const [hasPasskey, setHasPasskey] = useState(false);
 
+    useEffect(() => {
+        let alive = true;
+
+        fetch("/api/admin/me", { credentials: "include", cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : { ok: false }))
+            .then(async (data) => {
+                if (!alive) return;
+                if (data?.ok) {
+                    setAuthed(true);
+                    await refreshLatest();
+                }
+            })
+            .catch(() => { });
+
+        // 2) hay passkey registrada en el server
+        fetch("/api/admin/webauthn/status", { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : { hasPasskey: false }))
+            .then((d) => alive && setHasPasskey(!!d?.hasPasskey))
+            .catch(() => alive && setHasPasskey(false));
+        // 3) este dispositivo soporta passkeys?
+        (async () => {
+            try {
+                if (
+                    !window.PublicKeyCredential ||
+                    typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable !== "function"
+                ) {
+                    if (alive) setCanPasskey(false);
+                    return;
+                }
+                const ok = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+                if (alive) setCanPasskey(!!ok);
+            } catch (e) {
+                console.error("canPasskey check failed", e);
+                if (alive) setCanPasskey(false);
+            }
+        })();
+
+        return () => {
+            alive = false;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        const t = setTimeout(() => {
+            setCanPasskey((v) => (v === null ? false : v));
+        }, 1200);
+        return () => clearTimeout(t);
+    }, []);
 
     const selectedTitle = useMemo(
         () => SERVICES.find((x) => x.id === selectedServiceId)?.title || "Servicio",
@@ -112,27 +167,42 @@ export default function AdminPage() {
     // ---------- auth ----------
     async function login() {
         setNotice(null);
+        setLoadingLogin(true);
 
-        const r = await fetch("/api/admin/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ password: pwd }),
-            credentials: "include",
-            cache: "no-store",
-        });
+        try {
+            const r = await fetch("/api/admin/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password: pwd }),
+                credentials: "include",
+                cache: "no-store",
+            });
 
-        if (!r.ok) {
-            setNotice({ kind: "error", title: "Clave incorrecta", detail: "Intenta otra vez." });
-            return;
+            const data = await r.json().catch(() => ({}));
+
+            if (!r.ok) {
+                setNotice({
+                    kind: "error",
+                    title: data?.message || "No se pudo entrar",
+                    detail: r.status === 429 ? "Demasiados intentos. Espera un rato." : "Intenta otra vez.",
+                });
+                return;
+            }
+
+            setAuthed(true);
+            setPwd("");
+            setNotice({ kind: "success", title: "Listo", detail: "Ya puedes subir fotos." });
+            await refreshLatest();
+        } finally {
+            setLoadingLogin(false);
         }
-
-        setAuthed(true);
-        setPwd("");
-        setNotice({ kind: "success", title: "Listo", detail: "Ya puedes subir fotos." });
-        await refreshLatest();
     }
 
-    function logout() {
+    async function logout() {
+        try {
+            await fetch("/api/admin/logout", { method: "POST", credentials: "include" });
+        } catch { }
+
         setAuthed(false);
         setPwd("");
         setNotice(null);
@@ -142,6 +212,75 @@ export default function AdminPage() {
         setConfirmDelete(null);
     }
 
+    async function passkeyLogin() {
+        setNotice(null);
+        setLoadingPasskey(true);
+
+        try {
+            const opts = await fetch("/api/admin/webauthn/login/options", { cache: "no-store" }).then((r) => r.json());
+            const cred = await startAuthentication(opts);
+
+            const vr = await fetch("/api/admin/webauthn/login/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(cred),
+                credentials: "include",
+                cache: "no-store",
+            });
+
+            if (!vr.ok) {
+                setNotice({ kind: "error", title: "No se pudo ingresar", detail: "Intenta otra vez." });
+                return;
+            }
+
+            setAuthed(true);
+            setNotice({ kind: "success", title: "Listo", detail: "Entraste con Face ID / Huella." });
+            await refreshLatest();
+        } catch (e: any) {
+            // Cancelaciones típicas
+            const msg = String(e?.message || "");
+            if (msg.toLowerCase().includes("abort") || msg.toLowerCase().includes("cancel")) {
+                setNotice({ kind: "info", title: "Cancelado", detail: "No pasó nada." });
+            } else {
+                setNotice({
+                    kind: "error",
+                    title: "Error con Passkey",
+                    detail: "Si estás dentro de Instagram, abre en Safari/Chrome.",
+                });
+            }
+        } finally {
+            setLoadingPasskey(false);
+        }
+    }
+
+    async function passkeyRegister() {
+        setNotice(null);
+        setLoadingPasskey(true);
+
+        try {
+            const opts = await fetch("/api/admin/webauthn/register/options", { cache: "no-store" }).then((r) => r.json());
+            const cred = await startRegistration(opts);
+
+            const vr = await fetch("/api/admin/webauthn/register/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(cred),
+                cache: "no-store",
+            });
+
+            if (!vr.ok) {
+                setNotice({ kind: "error", title: "No se pudo registrar", detail: "Intenta otra vez." });
+                return;
+            }
+
+            setHasPasskey(true);
+            setNotice({ kind: "success", title: "Passkey registrada", detail: "Ya puedes entrar con Face ID / Huella." });
+        } catch {
+            setNotice({ kind: "error", title: "No se pudo registrar", detail: "Intenta de nuevo (mejor en Safari/Chrome)." });
+        } finally {
+            setLoadingPasskey(false);
+        }
+    }
     function clearSessionUploads() {
         setSessionUploads([]);
         setNotice({
@@ -459,6 +598,7 @@ export default function AdminPage() {
         mediaType?: "image" | "video";
         onDelete: () => void;
     }) {
+
         return (
             <div className="group rounded-2xl border bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                 <div className="relative aspect-square bg-black/5">
@@ -592,31 +732,130 @@ export default function AdminPage() {
     if (!authed) {
         return (
             <main className="min-h-screen flex items-center justify-center p-6 bg-[#fdfafb]">
-                <div className="w-full max-w-md rounded-2xl border p-6 bg-white shadow-sm">
-                    <h1 className="text-xl font-bold mb-2">Admin Caroline Trenzas</h1>
-                    <p className="text-sm text-[#89616f] mb-4">Ingresa la clave para subir fotos.</p>
+                <div className="w-full max-w-md rounded-2xl border bg-white shadow-sm overflow-hidden">
+                    {/* Header */}
+                    <div className="p-6 border-b bg-white">
+                        <h1 className="text-xl font-black text-[#181113]">Admin Caroline Trenzas</h1>
+                        <p className="text-sm text-[#89616f] mt-1">
+                            Acceso privado para subir fotos y reels.
+                        </p>
+                    </div>
 
-                    <input
-                        type="password"
-                        value={pwd}
-                        onChange={(e) => setPwd(e.target.value)}
-                        className="w-full border rounded-xl px-4 py-3 mb-3"
-                        placeholder="Clave"
-                    />
+                    {/* Body */}
+                    <div className="p-6 space-y-4">
+                        {/* Passkey CTA */}
+                        {canPasskey === null ? (
+                            <div className="w-full rounded-xl border border-[#f4f0f2] bg-[#fdfafb] py-3 text-center text-sm text-[#89616f]">
+                                Comprobando Face ID / Huella…
+                            </div>
+                        ) : !canPasskey ? (
+                            <div className="w-full rounded-xl border border-[#f4f0f2] bg-[#fdfafb] py-3 px-4 text-sm text-[#89616f]">
+                                Face ID / Huella no disponible en este navegador.
+                            </div>
+                        ) : hasPasskey ? (
+                            <button
+                                onClick={passkeyLogin}
+                                disabled={loadingPasskey}
+                                className="w-full rounded-xl bg-[#181113] text-white font-bold py-3 hover:opacity-90 disabled:opacity-60"
+                            >
+                                {loadingPasskey ? "Abriendo Face ID / Huella..." : "Entrar con Face ID / Huella"}
+                            </button>
+                        ) : (
+                            <div className="rounded-xl border border-primary/15 bg-primary/5 p-4">
+                                <p className="text-sm font-bold text-[#181113]">Activa Face ID / Huella</p>
+                                <p className="text-sm text-[#89616f] mt-1">
+                                    Este dispositivo aún no está registrado. Regístralo una vez y después podrás entrar con un toque.
+                                </p>
+                            </div>
+                        )}
 
-                    <button onClick={login} className="w-full rounded-xl bg-primary text-white font-bold py-3">
-                        Entrar
-                    </button>
-
-                    {notice ? (
-                        <div className="mt-4 rounded-xl border p-4">
-                            <p className="font-bold">
-                                {notice.kind === "error" ? "❌ " : notice.kind === "success" ? "✅ " : "ℹ️ "}
-                                {notice.title}
-                            </p>
-                            {notice.detail ? <p className="text-sm text-[#89616f] mt-1">{notice.detail}</p> : null}
+                        {/* Registro: solo si está soportado, y solo si NO protegiste register con sesión */}
+                        {canPasskey && !hasPasskey ? (
+                            <div className="flex items-center justify-between gap-3">
+                                <span className="text-xs text-[#89616f]">¿Primera vez aquí?</span>
+                                <button
+                                    type="button"
+                                    onClick={passkeyRegister}
+                                    disabled={loadingPasskey}
+                                    className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
+                                >
+                                    {loadingPasskey ? "Registrando..." : "Registrar Face ID / Huella"}
+                                </button>
+                            </div>
+                        ) : null}
+                        {/* Divider */}
+                        <div className="flex items-center gap-3 py-2">
+                            <div className="h-px flex-1 bg-[#f4f0f2]" />
+                            <span className="text-xs text-[#89616f]">o con clave</span>
+                            <div className="h-px flex-1 bg-[#f4f0f2]" />
                         </div>
-                    ) : null}
+
+                        {/* Password */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold text-[#181113]">Clave</label>
+
+                            <div className="relative">
+                                <input
+                                    type={showPwd ? "text" : "password"}
+                                    value={pwd}
+                                    onChange={(e) => setPwd(e.target.value)}
+                                    placeholder="Escribe la clave"
+                                    autoComplete="new-password"
+                                    className="w-full rounded-full border border-[#f4f0f2] bg-white px-5 py-3 pr-14 text-[16px]
+               focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary"
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") login();
+                                    }}
+                                />
+
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPwd((v) => !v)}
+                                    className="absolute inset-y-0 right-3 my-auto size-9 rounded-full hover:bg-black/5
+                                        flex items-center justify-center"
+                                    aria-label={showPwd ? "Ocultar clave" : "Mostrar clave"}
+                                >
+                                    <span className="material-symbols-outlined text-xl text-[#89616f]">
+                                        {showPwd ? "visibility_off" : "visibility"}
+                                    </span>
+                                </button>
+                            </div>
+
+                            <button
+                                onClick={login}
+                                disabled={loadingLogin || !pwd.trim()}
+                                className="w-full rounded-xl bg-primary text-white font-bold py-3 hover:bg-primary/90 disabled:opacity-60"
+                            >
+                                {loadingLogin ? "Entrando..." : "Entrar con clave"}
+                            </button>
+                        </div>
+
+                        {/* Notice */}
+                        {notice ? (
+                            <div
+                                className={
+                                    "rounded-xl border p-4 " +
+                                    (notice.kind === "error"
+                                        ? "border-red-200 bg-red-50"
+                                        : notice.kind === "success"
+                                            ? "border-green-200 bg-green-50"
+                                            : "border-[#f4f0f2] bg-[#fdfafb]")
+                                }
+                            >
+                                <p className="font-bold text-[#181113]">
+                                    {notice.kind === "error" ? "❌ " : notice.kind === "success" ? "✅ " : "ℹ️ "}
+                                    {notice.title}
+                                </p>
+                                {notice.detail ? (
+                                    <p className="text-sm text-[#89616f] mt-1">{notice.detail}</p>
+                                ) : null}
+                            </div>
+                        ) : null}
+
+                        <p className="text-[11px] text-[#89616f] text-center pt-2">
+                            Si estás dentro de Instagram, abre en Safari/Chrome para usar Face ID.
+                        </p>
+                    </div>
                 </div>
             </main>
         );
