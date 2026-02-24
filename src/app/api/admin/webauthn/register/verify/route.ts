@@ -3,8 +3,8 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { verifyRegistrationResponse } from "@simplewebauthn/server";
 import { clearChallenge, getChallenge, getCreds, setCreds } from "@/lib/webauthnStore";
-import { bufToB64url } from "@/lib/b64url";
 import { requireAdmin } from "@/lib/requireAdmin";
+import { toB64url } from "@/lib/b64url";
 
 export async function POST(req: Request) {
     const guard = await requireAdmin(req);
@@ -17,29 +17,26 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, message: "Challenge expirado" }, { status: 400 });
     }
 
-    const rpID = process.env.WEBAUTHN_RP_ID || "localhost";
-    const origin = process.env.WEBAUTHN_ORIGIN || "http://localhost:3000";
+    const rpID = process.env.WEBAUTHN_RP_ID!;
+    const origin = process.env.WEBAUTHN_ORIGIN!;
 
     const verification = await verifyRegistrationResponse({
         response: body,
         expectedChallenge,
         expectedOrigin: origin,
         expectedRPID: rpID,
-    });
+    } as any);
 
     if (!verification.verified) {
-        return NextResponse.json({ ok: false }, { status: 401 });
+        return NextResponse.json({ ok: false, message: "Verificación falló" }, { status: 401 });
     }
 
-    const info: any = verification.registrationInfo;
+    const info: any = (verification as any).registrationInfo;
     if (!info) {
-        return NextResponse.json(
-            { ok: false, message: "registrationInfo vacío" },
-            { status: 500 }
-        );
+        return NextResponse.json({ ok: false, message: "registrationInfo vacío" }, { status: 500 });
     }
 
-    // ✅ compat: nombres cambian según versión de simplewebauthn
+    // Compat: nombres cambian según versión
     const credentialID =
         info.credentialID ??
         info.credentialId ??
@@ -56,16 +53,16 @@ export async function POST(req: Request) {
 
     const counter = info.counter ?? info.credential?.counter ?? 0;
 
-    if (!credentialID || !credentialPublicKey) {
-        // 🔍 esto te dirá exactamente qué está llegando en Vercel
+    // Normaliza a base64url (string)
+    const idB64url = toB64url(credentialID);
+    const pkB64url = toB64url(credentialPublicKey);
+
+    if (!idB64url || !pkB64url) {
         return NextResponse.json(
             {
                 ok: false,
-                message: "No pude extraer credentialID/publicKey",
-                debug: {
-                    registrationInfoKeys: Object.keys(info || {}),
-                    registrationInfo: info,
-                },
+                message: "No pude normalizar credenciales",
+                debug: { keys: Object.keys(info || {}), hasId: !!credentialID, hasPk: !!credentialPublicKey },
             },
             { status: 500 }
         );
@@ -73,22 +70,13 @@ export async function POST(req: Request) {
 
     const creds = await getCreds();
 
-    const savedId = String(body.id || body.rawId || "");
-    if (!savedId) {
-        return NextResponse.json(
-            { ok: false, message: "No llegó id/rawId desde el browser" },
-            { status: 500 }
-        );
+    // evita duplicados
+    const exists = creds.some((c) => c.id === idB64url);
+    if (!exists) {
+        creds.push({ id: idB64url, publicKey: pkB64url, counter });
+        await setCreds(creds);
     }
 
-    creds.push({
-        id: savedId, // ✅ coincide con login body.id
-        publicKey: bufToB64url(credentialPublicKey as any),
-        counter,
-    });
-
-    await setCreds(creds);
     await clearChallenge();
-
     return NextResponse.json({ ok: true });
 }
