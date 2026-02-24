@@ -33,54 +33,56 @@ export async function POST(req: Request) {
         }
 
         const info: any = (verification as any).registrationInfo;
-        const cred = info.credential;
+        const cred: any = info?.credential;
 
-        // En esta versión, viene dentro de registrationInfo.credential
-        const credId =
-            cred?.id ??
-            cred?.credentialID ??
-            cred?.credentialId;
+        // ✅ ID REAL: SIEMPRE úsalo desde el body (browser)
+        const idB64url = String(body?.id || "").replace(/=+$/g, "");
+        if (!idB64url) {
+            return NextResponse.json(
+                { ok: false, message: "body.id vacío (no llegó el credential id)" },
+                { status: 500 }
+            );
+        }
 
-        const credPk =
+        // ✅ PublicKey: viene desde verification.registrationInfo
+        const publicKeyRaw =
+            info?.credentialPublicKey ??
             cred?.publicKey ??
             cred?.credentialPublicKey ??
             cred?.credentialPublicKeyBytes;
 
-        const counter =
-            info.counter ??
-            cred?.counter ??
-            0;
-
-        if (!credId || !credPk) {
+        if (!publicKeyRaw) {
             return NextResponse.json(
                 {
                     ok: false,
-                    message: "registrationInfo incompleto",
+                    message: "No vino credentialPublicKey",
                     debug: {
-                        keys: Object.keys(info || {}),
+                        infoKeys: Object.keys(info || {}),
                         credKeys: Object.keys(cred || {}),
-                        hasId: !!credId,
-                        hasPk: !!credPk,
                     },
                 },
                 { status: 500 }
             );
         }
 
-        const idB64url = isoBase64URL.fromBuffer(credId);
-        const pkB64url = isoBase64URL.fromBuffer(credPk);
+        const pkB64url = isoBase64URL.fromBuffer(publicKeyRaw);
+        const counter = info?.counter ?? cred?.counter ?? 0;
 
         const creds = await getCreds();
-        if (!creds.some((c) => c.id === idB64url)) {
-            creds.push({ id: idB64url, publicKey: pkB64url, counter });
-            await setCreds(creds);
-        }
+        const next = creds.some((c) => c.id === idB64url)
+            ? creds
+            : [...creds, { id: idB64url, publicKey: pkB64url, counter }];
 
+        await setCreds(next);
         await clearChallenge();
+
         const after = await getCreds();
         return NextResponse.json({ ok: true, count: after.length });
     } catch (e: any) {
         console.error("REGISTER VERIFY ERROR", e);
-        return NextResponse.json({ ok: false, message: e?.message || "Error register/verify" }, { status: 500 });
+        return NextResponse.json(
+            { ok: false, message: e?.message || "Error register/verify" },
+            { status: 500 }
+        );
     }
 }
