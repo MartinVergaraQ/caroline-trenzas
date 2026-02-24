@@ -19,10 +19,10 @@ export async function POST(req: Request) {
 
     const creds = await getCreds();
 
-    const incomingId = normalizeIdToB64url(body.id);
-    const incomingRaw = normalizeIdToB64url(body.rawId);
-
-    const match = creds.find((c) => c.id === incomingId || c.id === incomingRaw);
+    const stripPad = (s: string) => s.replace(/=+$/g, "");
+    const incomingId = stripPad(String(body.id));
+    const incomingRaw = stripPad(String(body.rawId));
+    const match = creds.find(c => stripPad(c.id) === incomingId || stripPad(c.id) === incomingRaw);
 
     if (!match) {
         return NextResponse.json(
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
         expectedOrigin: origin,
         expectedRPID: rpID,
         credential: {
-            id: match.id,
+            id: b64urlToBuf(match.id),          // ✅
             publicKey: b64urlToBuf(match.publicKey),
             counter: match.counter,
         },

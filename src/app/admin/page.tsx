@@ -831,7 +831,7 @@ export default function AdminPage() {
                                     value={pwd}
                                     onChange={(e) => setPwd(e.target.value)}
                                     placeholder="Escribe la clave"
-                                    autoComplete="new-password"
+                                    autoComplete="current-password"
                                     className="w-full h-12 appearance-none rounded-full border border-[#f4f0f2] bg-white px-5 pr-14 text-[16px] leading-5
       focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary"
                                     onKeyDown={(e) => {
