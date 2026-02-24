@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
+import { requireAdmin } from "@/lib/requireAdmin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,15 +23,13 @@ function mapRes(res: any): Img[] {
         src: r.secure_url,
         publicId: r.public_id,
         createdAt: r.created_at,
-        folder: r.asset_folder || "", // mejor que parsear public_id
+        folder: r.asset_folder || "",
     }));
 }
 
 export async function GET(req: Request) {
-    const cookie = req.headers.get("cookie") || "";
-    if (!cookie.includes("admin_ok=1")) {
-        return NextResponse.json({ ok: false }, { status: 401 });
-    }
+    const guard = await requireAdmin(req);
+    if (!guard.ok) return guard.res;
 
     const [galleryRes, servicesRes] = await Promise.all([
         cloudinary.search

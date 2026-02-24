@@ -48,13 +48,18 @@ type ConfirmDeleteState = null | {
     mediaType?: "image" | "video";
     contextLabel?: string;
 };
+type ToastKind = "success" | "error" | "info";
+
+type Toast = {
+    id: string;
+    kind: ToastKind;
+    title: string;
+    detail?: string;
+};
 
 export default function AdminPage() {
     const [authed, setAuthed] = useState(false);
     const [pwd, setPwd] = useState("");
-
-    const [notice, setNotice] = useState<Notice>(null);
-
     const [selectedServiceId, setSelectedServiceId] = useState(SERVICES[0].id);
 
     // Subidas de la sesión (para deshacer sin ir a Cloudinary)
@@ -81,6 +86,50 @@ export default function AdminPage() {
     const [canPasskey, setCanPasskey] = useState<boolean | null>(null);
     const [loadingPasskey, setLoadingPasskey] = useState(false);
     const [hasPasskey, setHasPasskey] = useState(false);
+
+    const [toasts, setToasts] = useState<Toast[]>([]);
+
+    function pushToast(kind: ToastKind, title: string, detail?: string) {
+        const id = (globalThis.crypto?.randomUUID?.() ?? String(Date.now() + Math.random()));
+        setToasts((prev) => [{ id, kind, title, detail }, ...prev].slice(0, 4));
+        window.setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), kind === "error" ? 6000 : 3200);
+    }
+
+    function ToastStack() {
+        return (
+            <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 w-[min(360px,calc(100vw-2rem))]">
+                {toasts.map((t) => {
+                    const styles =
+                        t.kind === "success"
+                            ? "border-green-200 bg-green-50"
+                            : t.kind === "error"
+                                ? "border-red-200 bg-red-50"
+                                : "border-[#f4f0f2] bg-white";
+
+                    const icon = t.kind === "success" ? "✅" : t.kind === "error" ? "❌" : "ℹ️";
+
+                    return (
+                        <div key={t.id} className={`rounded-2xl border shadow-sm p-4 ${styles}`}>
+                            <div className="flex items-start gap-3">
+                                <div className="text-lg leading-none mt-[2px]">{icon}</div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="font-bold text-[#181113]">{t.title}</p>
+                                    {t.detail ? <p className="text-sm text-[#89616f] mt-1 break-words">{t.detail}</p> : null}
+                                </div>
+                                <button
+                                    onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
+                                    className="ml-2 rounded-full size-8 hover:bg-black/5 flex items-center justify-center"
+                                    aria-label="Cerrar"
+                                >
+                                    <span className="material-symbols-outlined text-xl text-[#89616f]">close</span>
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    }
 
     useEffect(() => {
         let alive = true;
@@ -166,7 +215,6 @@ export default function AdminPage() {
 
     // ---------- auth ----------
     async function login() {
-        setNotice(null);
         setLoadingLogin(true);
 
         try {
@@ -181,18 +229,13 @@ export default function AdminPage() {
             const data = await r.json().catch(() => ({}));
 
             if (!r.ok) {
-                setNotice({
-                    kind: "error",
-                    title: data?.message || "No se pudo entrar",
-                    detail: r.status === 429 ? "Demasiados intentos. Espera un rato." : "Intenta otra vez.",
-                });
+                pushToast("error", data?.message || "No se pudo entrar", r.status === 429 ? "Demasiados intentos. Espera un rato." : "Intenta otra vez.");
                 return;
             }
 
             setAuthed(true);
             setPwd("");
-            setNotice({ kind: "success", title: "Listo", detail: "Ya puedes subir fotos." });
-            await refreshLatest();
+            pushToast("success", "Listo", "Ya puedes subir fotos");
         } finally {
             setLoadingLogin(false);
         }
@@ -205,7 +248,6 @@ export default function AdminPage() {
 
         setAuthed(false);
         setPwd("");
-        setNotice(null);
         setSessionUploads([]);
         setGalleryLatest([]);
         setServicesLatest([]);
@@ -213,7 +255,6 @@ export default function AdminPage() {
     }
 
     async function passkeyLogin() {
-        setNotice(null);
         setLoadingPasskey(true);
 
         try {
@@ -224,13 +265,9 @@ export default function AdminPage() {
 
             const opts = await or.json().catch(() => ({}));
             if (!or.ok) {
-                setNotice({
-                    kind: "error",
-                    title: "No se pudo iniciar",
-                    detail:
-                        (opts?.message || `HTTP ${or.status}`) +
-                        (opts?.debug ? ` | debug: ${JSON.stringify(opts.debug)}` : ""),
-                });
+                pushToast("error", "No se pudo iniciar",
+                    (opts?.message || `HTTP ${or.status}`) +
+                    (opts?.debug ? ` | debug: ${JSON.stringify(opts.debug)}` : ""));
                 return;
             }
 
@@ -247,33 +284,24 @@ export default function AdminPage() {
             const data = await vr.json().catch(() => ({}));
 
             if (!vr.ok) {
-                setNotice({
-                    kind: "error",
-                    title: "No se pudo ingresar",
-                    detail:
-                        (data?.message || `HTTP ${vr.status}`) +
-                        (data?.debug ? ` | debug: ${JSON.stringify(data.debug)}` : ""),
-                });
+                pushToast("error", "No se pudo ingresar",
+                    (data?.message || `HTTP ${vr.status}`) +
+                    (data?.debug ? ` | debug: ${JSON.stringify(data.debug)}` : ""));
                 return;
             }
 
             setAuthed(true);
-            setNotice({ kind: "success", title: "Listo", detail: "Entraste con Face ID / Huella." });
+            pushToast("success", "Listo", "Entraste con Face ID / Huella.");
             await refreshLatest();
         } catch (e: any) {
             console.error("PASSKEY LOGIN ERROR", e);
-            setNotice({
-                kind: "error",
-                title: "Error con Passkey",
-                detail: `${e?.name || "Error"}: ${e?.message || e}`,
-            });
+            pushToast("error", "Error con Passkey", `${e?.name || "Error"}: ${e?.message || e}`);
         } finally {
             setLoadingPasskey(false);
         }
     }
 
     async function passkeyRegister() {
-        setNotice(null);
         setLoadingPasskey(true);
 
         try {
@@ -285,11 +313,7 @@ export default function AdminPage() {
             const opts = await ro.json().catch(() => ({}));
 
             if (!ro.ok) {
-                setNotice({
-                    kind: "error",
-                    title: "No se pudo iniciar el registro",
-                    detail: opts?.message || `HTTP ${ro.status} (debes entrar con clave primero)`,
-                });
+                pushToast("error", "No se pudo iniciar el registro", opts?.message || `HTTP ${ro.status} (debes entrar con clave primero)`)
                 return;
             }
 
@@ -306,24 +330,16 @@ export default function AdminPage() {
             const data = await rv.json().catch(() => ({}));
 
             if (!rv.ok) {
-                setNotice({
-                    kind: "error",
-                    title: "No se pudo registrar",
-                    detail:
-                        (data?.message || `HTTP ${rv.status}`) +
-                        (data?.debug ? ` | debug: ${JSON.stringify(data.debug)}` : ""),
-                });
+                pushToast("error", "No se pudo registrar",
+                    (data?.message || `HTTP ${rv.status}`) +
+                    (data?.debug ? ` | debug: ${JSON.stringify(data.debug)}` : ""));
                 return;
             }
 
             setHasPasskey(true);
 
             const total = data?.afterLen ?? data?.nextLen ?? "?";
-            setNotice({
-                kind: "success",
-                title: "Passkey registrada",
-                detail: `Guardada en servidor. Total: ${data?.count ?? "?"}`,
-            });
+            pushToast("success", "Passkey registrada", `Guardada en servidor. Total: ${data?.count ?? "?"}`);
 
             // opcional pero recomendable: refresca status desde el server
             fetch("/api/admin/webauthn/status", { cache: "no-store" })
@@ -333,29 +349,19 @@ export default function AdminPage() {
 
         } catch (e: any) {
             console.error("PASSKEY REGISTER ERROR", e);
-            setNotice({
-                kind: "error",
-                title: "No se pudo registrar",
-                detail: `${e?.name || "Error"}: ${e?.message || e}`,
-            });
+            pushToast("error", "No se pudo registrar", `${e?.name || "Error"}: ${e?.message || e}`);
         } finally {
             setLoadingPasskey(false);
         }
     }
     function clearSessionUploads() {
         setSessionUploads([]);
-        setNotice({
-            kind: "info",
-            title: "Sesión limpiada",
-            detail: "Se vació la lista local (no borra en Cloudinary).",
-        });
+        pushToast("info", "Sesión limpiada", "Se vació la lista local (no borra en Cloudinary).");
     }
 
     // ---------- data ----------
     async function refreshLatest() {
         setLoadingLatest(true);
-        setNotice(null);
-
         try {
             const [rg, rs] = await Promise.all([
                 fetch("/api/admin/media?type=gallery", {
@@ -373,11 +379,7 @@ export default function AdminPage() {
             setGalleryLatest(g.images || []);
             setServicesLatest(s.images || []);
         } catch (e: any) {
-            setNotice({
-                kind: "error",
-                title: "No se pudo actualizar",
-                detail: e?.message || "Revisa el log de Vercel o consola.",
-            });
+            pushToast("error", "No se pudo actualizar", e?.message || "Revisa el log de Vercel o consola.");
         } finally {
             setLoadingLatest(false);
         }
@@ -385,8 +387,6 @@ export default function AdminPage() {
 
     async function deleteByPublicId(publicId: string, resourceType?: "image" | "video") {
         setDeleting(true);
-        setNotice(null);
-
         try {
             const r = await fetch("/api/admin/delete", {
                 method: "POST",
@@ -398,11 +398,7 @@ export default function AdminPage() {
 
             if (!r.ok) {
                 const data = await r.json().catch(() => ({}));
-                setNotice({
-                    kind: "error",
-                    title: "No se pudo eliminar",
-                    detail: data?.message || `HTTP ${r.status}`,
-                });
+                pushToast("error", "No se pudo eliminar", data?.message || `HTTP ${r.status}`);
                 return;
             }
 
@@ -410,9 +406,9 @@ export default function AdminPage() {
             setGalleryLatest((prev) => prev.filter((x) => x.publicId !== publicId));
             setServicesLatest((prev) => prev.filter((x) => x.publicId !== publicId));
 
-            setNotice({ kind: "success", title: "Eliminada", detail: "Puedes subir otra." });
+            pushToast("success", "Eliminada", "Puedes subir otra.");
         } catch (e: any) {
-            setNotice({ kind: "error", title: "Error eliminando", detail: e?.message || "Mira consola." });
+            pushToast("error", "Error eliminando", e?.message || "Mira consola.");
         } finally {
             setDeleting(false);
             setConfirmDelete(null);
@@ -428,32 +424,18 @@ export default function AdminPage() {
         });
     }
     function openVideoUploader(asReel = false) {
-        setNotice(null);
-
         if (!cloudName) {
-            setNotice({
-                kind: "error",
-                title: "Faltan variables",
-                detail: "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME no está en .env / Vercel.",
-            });
+            pushToast("error", "Faltan variables", "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME no está en .env / Vercel.");
             return;
         }
 
         if (!presetGalleryVideo) {
-            setNotice({
-                kind: "error",
-                title: "Falta preset de video",
-                detail: "NEXT_PUBLIC_CLOUDINARY_GALLERY_VIDEO_PRESET no está seteado.",
-            });
+            pushToast("error", "Falta preset de video", "NEXT_PUBLIC_CLOUDINARY_GALLERY_VIDEO_PRESET no está seteado.");
             return;
         }
 
         if (!window.cloudinary) {
-            setNotice({
-                kind: "error",
-                title: "No cargó el widget",
-                detail: "Revisa que el Script del widget esté en layout.tsx.",
-            });
+            pushToast("error", "No cargó el widget", "Revisa que el Script del widget esté en layout.tsx.");
             return;
         }
 
@@ -483,11 +465,7 @@ export default function AdminPage() {
         const widget = window.cloudinary.createUploadWidget(options, async (error: any, result: any) => {
             if (error) {
                 console.error("CLOUDINARY VIDEO ERROR:", error);
-                setNotice({
-                    kind: "error",
-                    title: "Error subiendo video",
-                    detail: error?.message || "Mira consola.",
-                });
+                pushToast("error", "Error subiendo video", error?.message || "Mira consola.");
                 return;
             }
 
@@ -511,13 +489,13 @@ export default function AdminPage() {
                     return next.slice(0, 24);
                 });
 
-                setNotice({
-                    kind: "success",
-                    title: asReel ? "Reel subido" : "Video subido",
-                    detail: asReel
+                pushToast(
+                    "success",
+                    asReel ? "Reel subido" : "Video subido",
+                    asReel
                         ? "Se subió a Galería (destacado)."
                         : "Se subió a Galería (video).",
-                });
+                );
 
                 await refreshLatest();
             }
@@ -527,36 +505,25 @@ export default function AdminPage() {
     }
     // ---------- uploader ----------
     function openUploader(type: "gallery" | "services") {
-        setNotice(null);
-
         if (!cloudName) {
-            setNotice({
-                kind: "error",
-                title: "Faltan variables",
-                detail: "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME no está en .env / Vercel.",
-            });
+            pushToast("error", "Faltan variables", "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME no está en .env / Vercel.");
             return;
         }
 
         const uploadPreset = type === "gallery" ? presetGallery : presetServices;
         if (!uploadPreset) {
-            setNotice({
-                kind: "error",
-                title: "Falta preset",
-                detail:
-                    type === "gallery"
-                        ? "NEXT_PUBLIC_CLOUDINARY_GALLERY_PRESET no está seteado."
-                        : "NEXT_PUBLIC_CLOUDINARY_SERVICES_PRESET no está seteado.",
-            });
+            pushToast(
+                "error",
+                "Falta preset",
+                type === "gallery"
+                    ? "NEXT_PUBLIC_CLOUDINARY_GALLERY_PRESET no está seteado."
+                    : "NEXT_PUBLIC_CLOUDINARY_SERVICES_PRESET no está seteado.",
+            );
             return;
         }
 
         if (!window.cloudinary) {
-            setNotice({
-                kind: "error",
-                title: "No cargó el widget",
-                detail: "Revisa que el Script del widget esté en layout.tsx.",
-            });
+            pushToast("error", "No cargó el widget", "Revisa que el Script del widget esté en layout.tsx.");
             return;
         }
 
@@ -589,11 +556,7 @@ export default function AdminPage() {
         const widget = window.cloudinary.createUploadWidget(options, async (error: any, result: any) => {
             if (error) {
                 console.error("CLOUDINARY ERROR:", error);
-                setNotice({
-                    kind: "error",
-                    title: "Error subiendo",
-                    detail: error?.message || "Mira consola.",
-                });
+                pushToast("error", "Error subiendo", error?.message || "Mira consola.");
                 return;
             }
 
@@ -618,11 +581,11 @@ export default function AdminPage() {
                     return next.slice(0, 24);
                 });
 
-                setNotice({
-                    kind: "success",
-                    title: "Subida OK",
-                    detail: type === "services" ? `Se subió a Servicios (${selectedTitle}).` : "Se subió a Galería.",
-                });
+                pushToast(
+                    "success",
+                    "Subida OK",
+                    type === "services" ? `Se subió a Servicios (${selectedTitle}).` : "Se subió a Galería.",
+                );
 
                 await refreshLatest();
             }
@@ -793,6 +756,7 @@ export default function AdminPage() {
     if (!authed) {
         return (
             <main className="min-h-screen flex items-center justify-center p-6 bg-[#fdfafb]">
+                <ToastStack />
                 <div className="w-full max-w-md rounded-2xl border bg-white shadow-sm overflow-hidden">
                     {/* Header */}
                     <div className="p-6 border-b bg-white">
@@ -874,32 +838,6 @@ export default function AdminPage() {
                                 {loadingLogin ? "Entrando..." : "Entrar con clave"}
                             </button>
                         </div>
-
-                        {/* Notice */}
-                        {notice ? (
-                            <div
-                                className={
-                                    "rounded-xl border p-4 " +
-                                    (notice.kind === "error"
-                                        ? "border-red-200 bg-red-50"
-                                        : notice.kind === "success"
-                                            ? "border-green-200 bg-green-50"
-                                            : "border-[#f4f0f2] bg-[#fdfafb]")
-                                }
-                            >
-                                <p className="font-bold text-[#181113]">
-                                    {notice.kind === "error" ? "❌ " : notice.kind === "success" ? "✅ " : "ℹ️ "}
-                                    {notice.title}
-                                </p>
-                                {notice.detail ? (
-                                    <p className="text-sm text-[#89616f] mt-1">{notice.detail}</p>
-                                ) : null}
-                            </div>
-                        ) : null}
-
-                        <p className="text-[11px] text-[#89616f] text-center pt-2">
-                            Si estás dentro de Instagram, abre en Safari/Chrome para usar Face ID.
-                        </p>
                     </div>
                 </div>
             </main>
@@ -908,6 +846,7 @@ export default function AdminPage() {
 
     return (
         <main className="min-h-screen p-6 lg:p-12 bg-[#fdfafb]">
+            <ToastStack />
             <ConfirmDeleteModal state={confirmDelete} />
 
             <div className="max-w-5xl mx-auto bg-white border rounded-2xl p-6 shadow-sm">
@@ -960,13 +899,6 @@ export default function AdminPage() {
                             Subir 1 foto a Galería
                         </button>
                         <button
-                            onClick={() => openVideoUploader(false)}
-                            className="mt-3 w-full rounded-xl border py-3 font-bold hover:bg-black/5"
-                        >
-                            🎥 Subir video a Galería
-                        </button>
-
-                        <button
                             onClick={() => openVideoUploader(true)}
                             className="mt-2 w-full rounded-xl border py-3 font-bold hover:bg-black/5"
                             title="Estos aparecen arriba como Reels en la landing"
@@ -1007,17 +939,6 @@ export default function AdminPage() {
                         </p>
                     </div>
                 </div>
-
-                {/* NOTIFICATION */}
-                {notice ? (
-                    <div className="mt-6 rounded-2xl border p-5 bg-[#fdfafb]">
-                        <p className="font-bold">
-                            {notice.kind === "error" ? "❌ " : notice.kind === "success" ? "✅ " : "ℹ️ "}
-                            {notice.title}
-                        </p>
-                        {notice.detail ? <p className="text-sm text-[#89616f] mt-1">{notice.detail}</p> : null}
-                    </div>
-                ) : null}
 
                 {/* SUBIDAS DE LA SESIÓN */}
                 <div className="mt-10">

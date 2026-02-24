@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
+import { requireAdmin } from "@/lib/requireAdmin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,13 +12,9 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET!,
 });
 
-function isAuthed(req: Request) {
-    const cookie = req.headers.get("cookie") || "";
-    return cookie.includes("admin_ok=1");
-}
-
 export async function GET(req: Request) {
-    if (!isAuthed(req)) return NextResponse.json({ ok: false }, { status: 401 });
+    const guard = await requireAdmin(req);
+    if (!guard.ok) return guard.res;
 
     const { searchParams } = new URL(req.url);
     const type = (searchParams.get("type") || "").toLowerCase();
@@ -34,8 +31,6 @@ export async function GET(req: Request) {
         return NextResponse.json({ ok: false, message: "type inválido" }, { status: 400 });
     }
 
-    // Galería: images + videos
-    // Servicios: solo images
     const expression =
         type === "gallery"
             ? `(resource_type:image OR resource_type:video) AND folder:${folder}`
