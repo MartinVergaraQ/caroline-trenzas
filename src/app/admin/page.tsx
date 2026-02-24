@@ -248,7 +248,9 @@ export default function AdminPage() {
                 setNotice({
                     kind: "error",
                     title: "No se pudo ingresar",
-                    detail: data?.message || `HTTP ${vr.status}`,
+                    detail:
+                        (data?.message || `HTTP ${vr.status}`) +
+                        (data?.debug ? ` | debug: ${JSON.stringify(data.debug)}` : ""),
                 });
                 return;
             }
