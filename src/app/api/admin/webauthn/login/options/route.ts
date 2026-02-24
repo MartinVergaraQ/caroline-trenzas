@@ -3,28 +3,40 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { generateAuthenticationOptions } from "@simplewebauthn/server";
 import { setChallenge } from "@/lib/webauthnStore";
-import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import { redis } from "@/lib/adminSession";
 
 const CREDS_KEY = "admin:webauthn:creds";
 
-function parseCreds(raw: any): Array<{ id: string }> {
+function parseCreds(raw: any): any[] {
     if (!raw) return [];
-
     if (typeof raw === "string") {
-        try {
-            const parsed = JSON.parse(raw);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch {
-            return [];
-        }
+        try { return Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : []; } catch { return []; }
+    }
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === "object") return Object.values(raw);
+    return [];
+}
+
+// ✅ base64url -> Uint8Array (acepta string y objetos tipo Buffer serializado)
+function b64urlToU8(v: any): Uint8Array {
+    if (!v) throw new Error("id vacío");
+
+    // Buffer serializado { data:[...] }
+    if (typeof v === "object" && Array.isArray(v.data)) {
+        return new Uint8Array(v.data);
     }
 
-    if (Array.isArray(raw)) return raw;
+    // Uint8Array/ArrayBuffer
+    if (v instanceof Uint8Array) return v;
+    if (v instanceof ArrayBuffer) return new Uint8Array(v);
 
-    if (typeof raw === "object") return Object.values(raw);
+    // string base64url
+    const s = String(v).replace(/=+$/g, "");
+    const pad = "=".repeat((4 - (s.length % 4)) % 4);
+    const b64 = (s + pad).replace(/-/g, "+").replace(/_/g, "/");
 
-    return [];
+    // Node: Buffer.from es confiable
+    return new Uint8Array(Buffer.from(b64, "base64"));
 }
 
 export async function GET() {
@@ -34,29 +46,31 @@ export async function GET() {
             return NextResponse.json({ ok: false, message: "Falta WEBAUTHN_RP_ID" }, { status: 500 });
         }
 
-        // ✅ Lee Redis directo (misma key que ves en Upstash)
         const raw = await redis.get(CREDS_KEY);
-        const creds = parseCreds(raw).filter((c: any) => typeof c?.id === "string" && c.id.length > 0);
+        const creds = parseCreds(raw);
 
-        if (!creds.length) {
+        // filtra solo los que tengan id usable
+        const usable = creds.filter((c: any) => c && c.id);
+
+        if (!usable.length) {
             return NextResponse.json(
-                {
-                    ok: false,
-                    message: "No hay passkey registrada en el servidor",
-                    debug: {
-                        rawType: typeof raw,
-                        rawPreview: typeof raw === "string" ? raw.slice(0, 200) : raw,
-                    },
-                },
+                { ok: false, message: "No hay passkey registrada en el servidor", debug: { rawType: typeof raw } },
                 { status: 400 }
             );
         }
 
+        // DEBUG seguro para ver el tipo real que te estaba rompiendo
+        console.log("LOGIN OPTIONS CREDS TYPES", {
+            rawType: typeof raw,
+            firstIdType: typeof usable[0]?.id,
+            firstIdIsObjData: !!usable[0]?.id?.data,
+        });
+
         const options = await generateAuthenticationOptions({
             rpID,
             userVerification: "preferred",
-            allowCredentials: creds.map((c: any) => ({
-                id: isoBase64URL.toBuffer(String(c.id).replace(/=+$/g, "")),
+            allowCredentials: usable.map((c: any) => ({
+                id: b64urlToU8(c.id),
                 type: "public-key",
             })),
         } as any);
@@ -65,9 +79,6 @@ export async function GET() {
         return NextResponse.json(options);
     } catch (e: any) {
         console.error("LOGIN OPTIONS ERROR", e);
-        return NextResponse.json(
-            { ok: false, message: e?.message || "Error login/options" },
-            { status: 500 }
-        );
+        return NextResponse.json({ ok: false, message: e?.message || "Error login/options" }, { status: 500 });
     }
 }
