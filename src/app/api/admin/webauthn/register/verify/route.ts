@@ -33,16 +33,42 @@ export async function POST(req: Request) {
         }
 
         const info: any = (verification as any).registrationInfo;
-        if (!info?.credentialID || !info?.credentialPublicKey) {
+        const cred = info.credential;
+
+        // En esta versión, viene dentro de registrationInfo.credential
+        const credId =
+            cred?.id ??
+            cred?.credentialID ??
+            cred?.credentialId;
+
+        const credPk =
+            cred?.publicKey ??
+            cred?.credentialPublicKey ??
+            cred?.credentialPublicKeyBytes;
+
+        const counter =
+            info.counter ??
+            cred?.counter ??
+            0;
+
+        if (!credId || !credPk) {
             return NextResponse.json(
-                { ok: false, message: "registrationInfo incompleto", debug: { keys: Object.keys(info || {}) } },
+                {
+                    ok: false,
+                    message: "registrationInfo incompleto",
+                    debug: {
+                        keys: Object.keys(info || {}),
+                        credKeys: Object.keys(cred || {}),
+                        hasId: !!credId,
+                        hasPk: !!credPk,
+                    },
+                },
                 { status: 500 }
             );
         }
 
-        const idB64url = isoBase64URL.fromBuffer(info.credentialID);
-        const pkB64url = isoBase64URL.fromBuffer(info.credentialPublicKey);
-        const counter = info.counter ?? 0;
+        const idB64url = isoBase64URL.fromBuffer(credId);
+        const pkB64url = isoBase64URL.fromBuffer(credPk);
 
         const creds = await getCreds();
         if (!creds.some((c) => c.id === idB64url)) {
