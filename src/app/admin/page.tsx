@@ -317,11 +317,20 @@ export default function AdminPage() {
             }
 
             setHasPasskey(true);
+
+            const total = data?.count ?? data?.afterLen ?? data?.nextLen ?? "?";
+
             setNotice({
                 kind: "success",
                 title: "Passkey registrada",
-                detail: `Guardada en servidor. Total: ${data?.count ?? "?"}`,
+                detail: `Guardada en servidor. Total: ${total}`,
             });
+
+            // opcional pero recomendable: refresca status desde el server
+            fetch("/api/admin/webauthn/status", { cache: "no-store" })
+                .then((r) => r.json())
+                .then((s) => setHasPasskey(!!s?.hasPasskey))
+                .catch(() => { });
 
         } catch (e: any) {
             console.error("PASSKEY REGISTER ERROR", e);
