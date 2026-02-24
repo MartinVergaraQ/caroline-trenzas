@@ -318,8 +318,7 @@ export default function AdminPage() {
 
             setHasPasskey(true);
 
-            const total = data?.count ?? data?.afterLen ?? data?.nextLen ?? "?";
-
+            const total = data?.afterLen ?? data?.nextLen ?? "?";
             setNotice({
                 kind: "success",
                 title: "Passkey registrada",
