@@ -72,8 +72,17 @@ export async function POST(req: Request) {
     }
 
     const creds = await getCreds();
+
+    const savedId = String(body.id || body.rawId || "");
+    if (!savedId) {
+        return NextResponse.json(
+            { ok: false, message: "No llegó id/rawId desde el browser" },
+            { status: 500 }
+        );
+    }
+
     creds.push({
-        id: bufToB64url(credentialID as any),
+        id: savedId, // ✅ coincide con login body.id
         publicKey: bufToB64url(credentialPublicKey as any),
         counter,
     });
