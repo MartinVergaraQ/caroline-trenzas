@@ -2,9 +2,34 @@ export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { verifyAuthenticationResponse } from "@simplewebauthn/server";
-import { clearChallenge, getChallenge, getCreds, setCreds } from "@/lib/webauthnStore";
+import { clearChallenge, getChallenge, setCreds } from "@/lib/webauthnStore";
 import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import { ADMIN_COOKIE, SESSION_TTL_SEC, newToken, redis, sessionKey } from "@/lib/adminSession";
+
+const CREDS_KEY = "admin:webauthn:creds";
+
+function parseCreds(raw: any): Array<{ id: string; publicKey: string; counter: number }> {
+    if (!raw) return [];
+
+    let arr: any = [];
+    if (typeof raw === "string") {
+        try { arr = JSON.parse(raw); } catch { arr = []; }
+    } else if (Array.isArray(raw)) {
+        arr = raw;
+    } else if (typeof raw === "object") {
+        arr = Object.values(raw);
+    }
+
+    if (!Array.isArray(arr)) return [];
+
+    return arr
+        .filter((c: any) => typeof c?.id === "string" && typeof c?.publicKey === "string")
+        .map((c: any) => ({
+            id: String(c.id),
+            publicKey: String(c.publicKey),
+            counter: Number(c.counter ?? 0),
+        }));
+}
 
 export async function POST(req: Request) {
     try {
@@ -18,15 +43,21 @@ export async function POST(req: Request) {
         const rpID = process.env.WEBAUTHN_RP_ID!;
         const origin = process.env.WEBAUTHN_ORIGIN!;
 
-        const creds = await getCreds();
+        // ✅ Lee Redis directo igual que login/options
+        const raw = await redis.get(CREDS_KEY);
+        const creds = parseCreds(raw);
 
-        const incomingId = String(body.id).replace(/=+$/g, "");
-        const incomingRaw = String(body.rawId).replace(/=+$/g, "");
+        const incomingId = String(body?.id || "").replace(/=+$/g, "");
+        const incomingRaw = String(body?.rawId || "").replace(/=+$/g, "");
 
         const match = creds.find((c) => c.id === incomingId || c.id === incomingRaw);
         if (!match) {
             return NextResponse.json(
-                { ok: false, message: "Credencial no encontrada", debug: { incomingId, incomingRaw, stored: creds.map(c => c.id) } },
+                {
+                    ok: false,
+                    message: "Credencial no encontrada",
+                    debug: { incomingId, incomingRaw, stored: creds.map(c => c.id), rawType: typeof raw },
+                },
                 { status: 401 }
             );
         }
@@ -37,8 +68,8 @@ export async function POST(req: Request) {
             expectedOrigin: origin,
             expectedRPID: rpID,
             credential: {
-                id: isoBase64URL.toBuffer(match.id),
-                publicKey: isoBase64URL.toBuffer(match.publicKey),
+                id: isoBase64URL.toBuffer(String(match.id).replace(/=+$/g, "")),
+                publicKey: isoBase64URL.toBuffer(String(match.publicKey).replace(/=+$/g, "")),
                 counter: match.counter,
             },
         } as any);
@@ -48,7 +79,11 @@ export async function POST(req: Request) {
         }
 
         const newCounter = (verification as any).authenticationInfo?.newCounter ?? match.counter;
-        await setCreds(creds.map((c) => (c.id === match.id ? { ...c, counter: newCounter } : c)));
+
+        // actualiza counter en la lista y guarda
+        const updated = creds.map((c) => (c.id === match.id ? { ...c, counter: newCounter } : c));
+        await setCreds(updated);
+
         await clearChallenge();
 
         const token = newToken();
