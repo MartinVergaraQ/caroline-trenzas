@@ -8,6 +8,7 @@ import { ADMIN_COOKIE, SESSION_TTL_SEC, newToken, redis, sessionKey } from "@/li
 
 export async function POST(req: Request) {
     const body = await req.json();
+
     const expectedChallenge = await getChallenge();
     if (!expectedChallenge) {
         return NextResponse.json({ ok: false, message: "Challenge expirado" }, { status: 400 });
@@ -16,11 +17,17 @@ export async function POST(req: Request) {
     const rpID = process.env.WEBAUTHN_RP_ID || "localhost";
     const origin = process.env.WEBAUTHN_ORIGIN || "http://localhost:3000";
 
-    const creds = await getCreds();
-    const match = creds.find((c) => c.id === body.id);
-    if (!match) return NextResponse.json({ ok: false }, { status: 401 });
+    const creds = await getCreds(); // ✅ TE FALTABA
+    const incomingId = String(body.id || body.rawId || "");
 
-    // La firma exacta varía; usamos shape compatible y casteo seguro
+    const match = creds.find((c) => c.id === incomingId);
+    if (!match) {
+        return NextResponse.json(
+            { ok: false, message: "Credencial no encontrada (id no coincide)" },
+            { status: 401 }
+        );
+    }
+
     const verification = await verifyAuthenticationResponse({
         response: body,
         expectedChallenge,
@@ -33,7 +40,12 @@ export async function POST(req: Request) {
         },
     } as any);
 
-    if (!verification.verified) return NextResponse.json({ ok: false }, { status: 401 });
+    if (!verification.verified) {
+        return NextResponse.json(
+            { ok: false, message: "Verificación falló" },
+            { status: 401 }
+        );
+    }
 
     const newCounter = (verification as any).authenticationInfo?.newCounter ?? match.counter;
     await setCreds(creds.map((c) => (c.id === match.id ? { ...c, counter: newCounter } : c)));
