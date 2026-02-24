@@ -217,7 +217,21 @@ export default function AdminPage() {
         setLoadingPasskey(true);
 
         try {
-            const opts = await fetch("/api/admin/webauthn/login/options", { cache: "no-store" }).then((r) => r.json());
+            const or = await fetch("/api/admin/webauthn/login/options", {
+                cache: "no-store",
+                credentials: "include",
+            });
+
+            const opts = await or.json().catch(() => ({}));
+            if (!or.ok) {
+                setNotice({
+                    kind: "error",
+                    title: "No se pudo iniciar",
+                    detail: opts?.message || `HTTP ${or.status}`,
+                });
+                return;
+            }
+
             const cred = await startAuthentication(opts);
 
             const vr = await fetch("/api/admin/webauthn/login/verify", {
@@ -228,8 +242,14 @@ export default function AdminPage() {
                 cache: "no-store",
             });
 
+            const data = await vr.json().catch(() => ({}));
+
             if (!vr.ok) {
-                setNotice({ kind: "error", title: "No se pudo ingresar", detail: "Intenta otra vez." });
+                setNotice({
+                    kind: "error",
+                    title: "No se pudo ingresar",
+                    detail: data?.message || `HTTP ${vr.status}`,
+                });
                 return;
             }
 
@@ -237,17 +257,12 @@ export default function AdminPage() {
             setNotice({ kind: "success", title: "Listo", detail: "Entraste con Face ID / Huella." });
             await refreshLatest();
         } catch (e: any) {
-            // Cancelaciones típicas
-            const msg = String(e?.message || "");
-            if (msg.toLowerCase().includes("abort") || msg.toLowerCase().includes("cancel")) {
-                setNotice({ kind: "info", title: "Cancelado", detail: "No pasó nada." });
-            } else {
-                setNotice({
-                    kind: "error",
-                    title: "Error con Passkey",
-                    detail: "Si estás dentro de Instagram, abre en Safari/Chrome.",
-                });
-            }
+            console.error("PASSKEY LOGIN ERROR", e);
+            setNotice({
+                kind: "error",
+                title: "Error con Passkey",
+                detail: `${e?.name || "Error"}: ${e?.message || e}`,
+            });
         } finally {
             setLoadingPasskey(false);
         }
@@ -890,11 +905,15 @@ export default function AdminPage() {
                     </div>
 
                     <div className="flex gap-2">
-                        {canPasskey && !hasPasskey ? (
-                            <div className="flex items-center justify-between gap-3">
-                                <span className="text-xs text-[#89616f]">¿Primera vez aquí?</span>
-                                <button type="button" onClick={passkeyRegister}>Registrar Face ID / Huella</button>
-                            </div>
+                        {canPasskey ? (
+                            <button
+                                type="button"
+                                onClick={passkeyRegister}
+                                disabled={loadingPasskey}
+                                className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
+                            >
+                                {loadingPasskey ? "Registrando..." : "Registrar Face ID / Huella"}
+                            </button>
                         ) : null}
                         <button
                             onClick={refreshLatest}

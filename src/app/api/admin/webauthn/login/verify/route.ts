@@ -18,12 +18,13 @@ export async function POST(req: Request) {
     const origin = process.env.WEBAUTHN_ORIGIN || "http://localhost:3000";
 
     const creds = await getCreds(); // ✅ TE FALTABA
-    const incomingId = String(body.id || body.rawId || "");
+    const incomingId = String(body.id || "");
+    const incomingRaw = String(body.rawId || "");
+    const match = creds.find((c) => c.id === incomingId || c.id === incomingRaw);
 
-    const match = creds.find((c) => c.id === incomingId);
     if (!match) {
         return NextResponse.json(
-            { ok: false, message: "Credencial no encontrada (id no coincide)" },
+            { ok: false, message: "Credencial no encontrada", debug: { incomingId, incomingRaw } },
             { status: 401 }
         );
     }
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
 
     if (!verification.verified) {
         return NextResponse.json(
-            { ok: false, message: "Verificación falló" },
+            { ok: false, message: "Verificación falló", debug: verification },
             { status: 401 }
         );
     }
