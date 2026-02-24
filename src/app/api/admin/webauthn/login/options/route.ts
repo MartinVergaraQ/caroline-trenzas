@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { generateAuthenticationOptions } from "@simplewebauthn/server";
 import { setChallenge } from "@/lib/webauthnStore";
 import { redis } from "@/lib/adminSession";
-import { b64urlToBuf } from "@/lib/b64url";
 
 const CREDS_KEY = "admin:webauthn:creds";
 
@@ -47,16 +46,17 @@ export async function GET() {
             );
         }
 
+        // ✅ v13: allowCredentials.id debe ser STRING base64url
         const options = await generateAuthenticationOptions({
-            rpID,
+            rpID: String(rpID),
             userVerification: "preferred",
             allowCredentials: creds.map((c: any) => ({
-                id: b64urlToBuf(c.id), // ✅ tu decoder (Uint8Array real)
+                id: String(c.id).replace(/=+$/g, ""),
                 type: "public-key",
             })),
         } as any);
 
-        await setChallenge(options.challenge);
+        await setChallenge((options as any).challenge);
         return NextResponse.json(options);
     } catch (e: any) {
         console.error("LOGIN OPTIONS ERROR", e);

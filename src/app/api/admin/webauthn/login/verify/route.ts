@@ -3,7 +3,6 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { verifyAuthenticationResponse } from "@simplewebauthn/server";
 import { clearChallenge, getChallenge, setCreds } from "@/lib/webauthnStore";
-import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import { ADMIN_COOKIE, SESSION_TTL_SEC, newToken, redis, sessionKey } from "@/lib/adminSession";
 import { b64urlToBuf } from "@/lib/b64url";
 
@@ -41,10 +40,12 @@ export async function POST(req: Request) {
             return NextResponse.json({ ok: false, message: "Challenge expirado" }, { status: 400 });
         }
 
-        const rpID = process.env.WEBAUTHN_RP_ID!;
-        const origin = process.env.WEBAUTHN_ORIGIN!;
+        const rpID = String(process.env.WEBAUTHN_RP_ID || "");
+        const origin = String(process.env.WEBAUTHN_ORIGIN || "");
+        if (!rpID || !origin) {
+            return NextResponse.json({ ok: false, message: "Faltan WEBAUTHN_RP_ID o WEBAUTHN_ORIGIN" }, { status: 500 });
+        }
 
-        // ✅ Lee Redis directo igual que login/options
         const raw = await redis.get(CREDS_KEY);
         const creds = parseCreds(raw);
 
@@ -69,8 +70,8 @@ export async function POST(req: Request) {
             expectedOrigin: origin,
             expectedRPID: rpID,
             credential: {
-                id: b64urlToBuf(match.id),
-                publicKey: b64urlToBuf(match.publicKey),
+                id: b64urlToBuf(String(match.id).replace(/=+$/g, "")),
+                publicKey: b64urlToBuf(String(match.publicKey).replace(/=+$/g, "")),
                 counter: match.counter,
             },
         } as any);
@@ -81,7 +82,6 @@ export async function POST(req: Request) {
 
         const newCounter = (verification as any).authenticationInfo?.newCounter ?? match.counter;
 
-        // actualiza counter en la lista y guarda
         const updated = creds.map((c) => (c.id === match.id ? { ...c, counter: newCounter } : c));
         await setCreds(updated);
 
