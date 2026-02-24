@@ -322,7 +322,7 @@ export default function AdminPage() {
             setNotice({
                 kind: "success",
                 title: "Passkey registrada",
-                detail: `Guardada en servidor. Total: ${total}`,
+                detail: `Guardada en servidor. Total: ${data?.count ?? "?"}` + (data?.debug ? ` | ${JSON.stringify(data.debug)}` : ""),
             });
 
             // opcional pero recomendable: refresca status desde el server

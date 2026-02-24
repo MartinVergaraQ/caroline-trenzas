@@ -41,7 +41,10 @@ export async function POST(req: Request) {
         // ✅ ID REAL: del body (browser)
         const idB64url = String(body?.id || "").replace(/=+$/g, "");
         if (!idB64url) {
-            return NextResponse.json({ ok: false, message: "body.id vacío (no llegó el credential id)" }, { status: 500 });
+            return NextResponse.json(
+                { ok: false, message: "body.id vacío (no llegó el credential id)" },
+                { status: 500 }
+            );
         }
 
         // ✅ PublicKey: de registrationInfo
@@ -53,7 +56,11 @@ export async function POST(req: Request) {
 
         if (!publicKeyRaw) {
             return NextResponse.json(
-                { ok: false, message: "No vino credentialPublicKey", debug: { infoKeys: Object.keys(info || {}), credKeys: Object.keys(cred || {}) } },
+                {
+                    ok: false,
+                    message: "No vino credentialPublicKey",
+                    debug: { infoKeys: Object.keys(info || {}), credKeys: Object.keys(cred || {}) },
+                },
                 { status: 500 }
             );
         }
@@ -67,21 +74,28 @@ export async function POST(req: Request) {
             : [...creds, { id: idB64url, publicKey: pkB64url, counter }];
 
         await setCreds(next);
-        await clearChallenge();
+        await clearChallenge(); // ✅ ahora sí se ejecuta siempre
 
-        // ✅ PRUEBA BRUTAL: lee Redis directo (sin getCreds)
-        const raw = await redis.get<string>(CREDS_KEY);
+        // ✅ PRUEBA BRUTAL: lee Redis directo
+        const raw = await redis.get(CREDS_KEY);
 
         return NextResponse.json({
             ok: true,
-            wroteId: idB64url,
-            nextLen: next.length,
-            redisRawType: typeof raw,
-            redisRawPreview: typeof raw === "string" ? raw.slice(0, 180) : raw,
-            afterLen: (await getCreds()).length,
+            count: next.length,
+            debug: {
+                vercelEnv: process.env.VERCEL_ENV || null,
+                commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || null,
+                redisUrlHint: (process.env.KV_REST_API_URL || "").slice(0, 35),
+                wroteId: idB64url,
+                rawType: typeof raw,
+                rawPreview: typeof raw === "string" ? raw.slice(0, 220) : raw,
+            },
         });
     } catch (e: any) {
         console.error("REGISTER VERIFY ERROR", e);
-        return NextResponse.json({ ok: false, message: e?.message || "Error register/verify" }, { status: 500 });
+        return NextResponse.json(
+            { ok: false, message: e?.message || "Error register/verify" },
+            { status: 500 }
+        );
     }
 }
