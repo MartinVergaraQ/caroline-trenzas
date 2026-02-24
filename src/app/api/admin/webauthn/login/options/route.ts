@@ -3,17 +3,24 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { generateAuthenticationOptions } from "@simplewebauthn/server";
 import { getCreds, setChallenge } from "@/lib/webauthnStore";
-import { b64urlToBuf } from "@/lib/b64url";
+import { isoBase64URL } from "@simplewebauthn/server/helpers";
 
 export async function GET() {
-    const rpID = process.env.WEBAUTHN_RP_ID || "localhost";
+    const rpID = process.env.WEBAUTHN_RP_ID;
+    if (!rpID) {
+        return NextResponse.json(
+            { ok: false, message: "Falta WEBAUTHN_RP_ID" },
+            { status: 500 }
+        );
+    }
+
     const creds = await getCreds();
 
     const options = await generateAuthenticationOptions({
         rpID,
         userVerification: "preferred",
         allowCredentials: creds.map((c) => ({
-            id: b64urlToBuf(c.id), // ✅ Uint8Array
+            id: isoBase64URL.toBuffer(c.id), // ✅ correcto
             type: "public-key",
         })),
     } as any);

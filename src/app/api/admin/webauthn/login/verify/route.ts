@@ -3,7 +3,7 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { verifyAuthenticationResponse } from "@simplewebauthn/server";
 import { clearChallenge, getChallenge, getCreds, setCreds } from "@/lib/webauthnStore";
-import { b64urlToBuf, normalizeIdToB64url } from "@/lib/b64url";
+import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import { ADMIN_COOKIE, SESSION_TTL_SEC, newToken, redis, sessionKey } from "@/lib/adminSession";
 
 export async function POST(req: Request) {
@@ -37,8 +37,8 @@ export async function POST(req: Request) {
         expectedOrigin: origin,
         expectedRPID: rpID,
         credential: {
-            id: b64urlToBuf(match.id),          // ✅
-            publicKey: b64urlToBuf(match.publicKey),
+            id: isoBase64URL.toBuffer(match.id),
+            publicKey: isoBase64URL.toBuffer(match.publicKey),
             counter: match.counter,
         },
     } as any);
