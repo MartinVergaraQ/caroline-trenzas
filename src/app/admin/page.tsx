@@ -258,25 +258,56 @@ export default function AdminPage() {
         setLoadingPasskey(true);
 
         try {
-            const opts = await fetch("/api/admin/webauthn/register/options", { cache: "no-store" }).then((r) => r.json());
+            const ro = await fetch("/api/admin/webauthn/register/options", {
+                cache: "no-store",
+                credentials: "include",
+            });
+
+            const opts = await ro.json().catch(() => ({}));
+
+            if (!ro.ok) {
+                setNotice({
+                    kind: "error",
+                    title: "No se pudo iniciar el registro",
+                    detail: opts?.message || `HTTP ${ro.status} (debes entrar con clave primero)`,
+                });
+                return;
+            }
+
             const cred = await startRegistration(opts);
 
-            const vr = await fetch("/api/admin/webauthn/register/verify", {
+            const rv = await fetch("/api/admin/webauthn/register/verify", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(cred),
                 cache: "no-store",
+                credentials: "include",
             });
 
-            if (!vr.ok) {
-                setNotice({ kind: "error", title: "No se pudo registrar", detail: "Intenta otra vez." });
+            const data = await rv.json().catch(() => ({}));
+
+            if (!rv.ok) {
+                setNotice({
+                    kind: "error",
+                    title: "No se pudo registrar",
+                    detail: data?.message || `HTTP ${rv.status}`,
+                });
                 return;
             }
 
             setHasPasskey(true);
-            setNotice({ kind: "success", title: "Passkey registrada", detail: "Ya puedes entrar con Face ID / Huella." });
-        } catch {
-            setNotice({ kind: "error", title: "No se pudo registrar", detail: "Intenta de nuevo (mejor en Safari/Chrome)." });
+            setNotice({
+                kind: "success",
+                title: "Passkey registrada",
+                detail: "Ya puedes entrar con Face ID / Huella.",
+            });
+        } catch (e: any) {
+            console.error("PASSKEY REGISTER ERROR", e);
+            setNotice({
+                kind: "error",
+                title: "No se pudo registrar",
+                detail: `${e?.name || "Error"}: ${e?.message || e}`,
+            });
         } finally {
             setLoadingPasskey(false);
         }
@@ -768,21 +799,6 @@ export default function AdminPage() {
                                 </p>
                             </div>
                         )}
-
-                        {/* Registro: solo si está soportado, y solo si NO protegiste register con sesión */}
-                        {canPasskey && !hasPasskey ? (
-                            <div className="flex items-center justify-between gap-3">
-                                <span className="text-xs text-[#89616f]">¿Primera vez aquí?</span>
-                                <button
-                                    type="button"
-                                    onClick={passkeyRegister}
-                                    disabled={loadingPasskey}
-                                    className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
-                                >
-                                    {loadingPasskey ? "Registrando..." : "Registrar Face ID / Huella"}
-                                </button>
-                            </div>
-                        ) : null}
                         {/* Divider */}
                         <div className="flex items-center gap-3 py-2">
                             <div className="h-px flex-1 bg-[#f4f0f2]" />
@@ -801,8 +817,8 @@ export default function AdminPage() {
                                     onChange={(e) => setPwd(e.target.value)}
                                     placeholder="Escribe la clave"
                                     autoComplete="new-password"
-                                    className="w-full rounded-full border border-[#f4f0f2] bg-white px-5 py-3 pr-14 text-[16px]
-               focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary"
+                                    className="w-full h-12 appearance-none rounded-full border border-[#f4f0f2] bg-white px-5 pr-14 text-[16px] leading-5
+      focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary"
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter") login();
                                     }}
@@ -811,8 +827,7 @@ export default function AdminPage() {
                                 <button
                                     type="button"
                                     onClick={() => setShowPwd((v) => !v)}
-                                    className="absolute inset-y-0 right-3 my-auto size-9 rounded-full hover:bg-black/5
-                                        flex items-center justify-center"
+                                    className="absolute inset-y-0 right-3 my-auto size-9 rounded-full hover:bg-black/5 flex items-center justify-center"
                                     aria-label={showPwd ? "Ocultar clave" : "Mostrar clave"}
                                 >
                                     <span className="material-symbols-outlined text-xl text-[#89616f]">
@@ -875,6 +890,12 @@ export default function AdminPage() {
                     </div>
 
                     <div className="flex gap-2">
+                        {canPasskey && !hasPasskey ? (
+                            <div className="flex items-center justify-between gap-3">
+                                <span className="text-xs text-[#89616f]">¿Primera vez aquí?</span>
+                                <button type="button" onClick={passkeyRegister}>Registrar Face ID / Huella</button>
+                            </div>
+                        ) : null}
                         <button
                             onClick={refreshLatest}
                             className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5"

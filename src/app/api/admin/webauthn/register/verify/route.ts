@@ -9,7 +9,9 @@ import { requireAdmin } from "@/lib/requireAdmin";
 export async function POST(req: Request) {
     const guard = await requireAdmin(req);
     if (!guard.ok) return guard.res;
+
     const body = await req.json();
+
     const expectedChallenge = await getChallenge();
     if (!expectedChallenge) {
         return NextResponse.json({ ok: false, message: "Challenge expirado" }, { status: 400 });
@@ -29,7 +31,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false }, { status: 401 });
     }
 
-    // Tipos varían por versión; extraemos “a prueba de TS”
     const info: any = verification.registrationInfo;
     if (!info) return NextResponse.json({ ok: false }, { status: 401 });
 
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
 
     const creds = await getCreds();
     creds.push({
-        id: bufToB64url(credentialID),             // guardamos como base64url string
+        id: bufToB64url(credentialID),
         publicKey: bufToB64url(credentialPublicKey),
         counter,
     });

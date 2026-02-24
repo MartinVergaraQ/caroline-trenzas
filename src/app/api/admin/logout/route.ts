@@ -12,6 +12,7 @@ function readCookie(req: Request, name: string) {
 
 export async function POST(req: Request) {
     const token = readCookie(req, ADMIN_COOKIE);
+
     if (token) {
         await redis.del(sessionKey(token));
     }
@@ -24,5 +25,6 @@ export async function POST(req: Request) {
         path: "/",
         maxAge: 0,
     });
+
     return res;
 }

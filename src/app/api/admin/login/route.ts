@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import crypto from "crypto";
-
-const redis = Redis.fromEnv();
+import { ADMIN_COOKIE, SESSION_TTL_SEC, newToken, redis, sessionKey } from "@/lib/adminSession";
 
 function getIP(req: Request) {
     const xf = req.headers.get("x-forwarded-for");
@@ -70,14 +69,18 @@ export async function POST(req: Request) {
         );
     }
 
-    // 3) set cookie (tu solución actual)
+    // 3) crear sesión token + guardar en redis + set cookie
+    const token = newToken(); // o crypto.randomBytes(32).toString("base64url")
+
+    await redis.set(sessionKey(token), "1", { ex: SESSION_TTL_SEC });
+
     const res = NextResponse.json({ ok: true });
-    res.cookies.set("admin_ok", "1", {
+    res.cookies.set(ADMIN_COOKIE, token, {
         httpOnly: true,
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
         path: "/",
-        maxAge: 60 * 60 * 6,
+        maxAge: SESSION_TTL_SEC,
     });
 
     return res;
