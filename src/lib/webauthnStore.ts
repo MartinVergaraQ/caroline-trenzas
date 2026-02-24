@@ -10,12 +10,27 @@ export type StoredCredential = {
 };
 
 export async function getCreds(): Promise<StoredCredential[]> {
+    console.log("ENV", process.env.VERCEL_ENV);
+    console.log(
+        "REDIS",
+        (process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || "").slice(0, 35)
+    );
+    console.log("KEY", CREDS_KEY);
+
     const raw = await redis.get<string>(CREDS_KEY);
     if (!raw) return [];
     try { return JSON.parse(raw); } catch { return []; }
 }
 
 export async function setCreds(creds: StoredCredential[]) {
+    console.log("ENV", process.env.VERCEL_ENV);
+    console.log(
+        "REDIS",
+        (process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || "").slice(0, 35)
+    );
+    console.log("KEY", CREDS_KEY);
+    console.log("SET CREDS LEN", creds.length);
+
     await redis.set(CREDS_KEY, JSON.stringify(creds));
 }
 
