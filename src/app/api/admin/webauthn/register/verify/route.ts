@@ -5,6 +5,9 @@ import { verifyRegistrationResponse } from "@simplewebauthn/server";
 import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import { clearChallenge, getChallenge, getCreds, setCreds } from "@/lib/webauthnStore";
 import { requireAdmin } from "@/lib/requireAdmin";
+import { redis } from "@/lib/adminSession";
+
+const CREDS_KEY = "admin:webauthn:creds";
 
 export async function POST(req: Request) {
     try {
@@ -35,16 +38,13 @@ export async function POST(req: Request) {
         const info: any = (verification as any).registrationInfo;
         const cred: any = info?.credential;
 
-        // ✅ ID REAL: SIEMPRE úsalo desde el body (browser)
+        // ✅ ID REAL: del body (browser)
         const idB64url = String(body?.id || "").replace(/=+$/g, "");
         if (!idB64url) {
-            return NextResponse.json(
-                { ok: false, message: "body.id vacío (no llegó el credential id)" },
-                { status: 500 }
-            );
+            return NextResponse.json({ ok: false, message: "body.id vacío (no llegó el credential id)" }, { status: 500 });
         }
 
-        // ✅ PublicKey: viene desde verification.registrationInfo
+        // ✅ PublicKey: de registrationInfo
         const publicKeyRaw =
             info?.credentialPublicKey ??
             cred?.publicKey ??
@@ -53,14 +53,7 @@ export async function POST(req: Request) {
 
         if (!publicKeyRaw) {
             return NextResponse.json(
-                {
-                    ok: false,
-                    message: "No vino credentialPublicKey",
-                    debug: {
-                        infoKeys: Object.keys(info || {}),
-                        credKeys: Object.keys(cred || {}),
-                    },
-                },
+                { ok: false, message: "No vino credentialPublicKey", debug: { infoKeys: Object.keys(info || {}), credKeys: Object.keys(cred || {}) } },
                 { status: 500 }
             );
         }
@@ -76,13 +69,19 @@ export async function POST(req: Request) {
         await setCreds(next);
         await clearChallenge();
 
-        const after = await getCreds();
-        return NextResponse.json({ ok: true, count: after.length });
+        // ✅ PRUEBA BRUTAL: lee Redis directo (sin getCreds)
+        const raw = await redis.get<string>(CREDS_KEY);
+
+        return NextResponse.json({
+            ok: true,
+            wroteId: idB64url,
+            nextLen: next.length,
+            redisRawType: typeof raw,
+            redisRawPreview: typeof raw === "string" ? raw.slice(0, 180) : raw,
+            afterLen: (await getCreds()).length,
+        });
     } catch (e: any) {
         console.error("REGISTER VERIFY ERROR", e);
-        return NextResponse.json(
-            { ok: false, message: e?.message || "Error register/verify" },
-            { status: 500 }
-        );
+        return NextResponse.json({ ok: false, message: e?.message || "Error register/verify" }, { status: 500 });
     }
 }
