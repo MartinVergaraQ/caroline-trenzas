@@ -5,6 +5,7 @@ import { verifyAuthenticationResponse } from "@simplewebauthn/server";
 import { clearChallenge, getChallenge, setCreds } from "@/lib/webauthnStore";
 import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import { ADMIN_COOKIE, SESSION_TTL_SEC, newToken, redis, sessionKey } from "@/lib/adminSession";
+import { b64urlToBuf } from "@/lib/b64url";
 
 const CREDS_KEY = "admin:webauthn:creds";
 
@@ -68,8 +69,8 @@ export async function POST(req: Request) {
             expectedOrigin: origin,
             expectedRPID: rpID,
             credential: {
-                id: isoBase64URL.toBuffer(String(match.id).replace(/=+$/g, "")),
-                publicKey: isoBase64URL.toBuffer(String(match.publicKey).replace(/=+$/g, "")),
+                id: b64urlToBuf(match.id),
+                publicKey: b64urlToBuf(match.publicKey),
                 counter: match.counter,
             },
         } as any);
