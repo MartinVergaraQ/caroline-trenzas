@@ -11,23 +11,26 @@ export type StoredCredential = {
 
 export async function getCreds(): Promise<StoredCredential[]> {
     const raw = await redis.get(CREDS_KEY);
-
     if (!raw) return [];
 
-    // Upstash puede devolverte el valor ya como objeto/array
-    if (Array.isArray(raw)) return raw as StoredCredential[];
+    const arr = Array.isArray(raw)
+        ? raw
+        : typeof raw === "string"
+            ? (() => { try { return JSON.parse(raw); } catch { return []; } })()
+            : [];
 
-    if (typeof raw === "string") {
-        try {
-            const parsed = JSON.parse(raw);
-            return Array.isArray(parsed) ? (parsed as StoredCredential[]) : [];
-        } catch {
-            return [];
-        }
-    }
+    if (!Array.isArray(arr)) return [];
 
-    // si viniera como objeto raro
-    return [];
+    // ✅ Normaliza y filtra basura
+    const norm = arr
+        .map((c: any) => ({
+            id: c?.id ?? c?.credentialID ?? c?.credentialId ?? null,
+            publicKey: c?.publicKey ?? c?.credentialPublicKey ?? c?.credentialPublicKeyBytes ?? null,
+            counter: typeof c?.counter === "number" ? c.counter : 0,
+        }))
+        .filter((c: any) => !!c.id && !!c.publicKey);
+
+    return norm as StoredCredential[];
 }
 
 export async function setCreds(creds: StoredCredential[]) {
