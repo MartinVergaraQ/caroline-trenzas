@@ -32,16 +32,49 @@ export async function POST(req: Request) {
     }
 
     const info: any = verification.registrationInfo;
-    if (!info) return NextResponse.json({ ok: false }, { status: 401 });
+    if (!info) {
+        return NextResponse.json(
+            { ok: false, message: "registrationInfo vacío" },
+            { status: 500 }
+        );
+    }
 
-    const credentialID: Uint8Array = info.credentialID;
-    const credentialPublicKey: Uint8Array = info.credentialPublicKey;
-    const counter: number = info.counter ?? 0;
+    // ✅ compat: nombres cambian según versión de simplewebauthn
+    const credentialID =
+        info.credentialID ??
+        info.credentialId ??
+        info.credential?.id ??
+        info.credential?.credentialID ??
+        info.credential?.credentialId;
+
+    const credentialPublicKey =
+        info.credentialPublicKey ??
+        info.credentialPublicKeyBytes ??
+        info.credential?.publicKey ??
+        info.credential?.credentialPublicKey ??
+        info.credential?.credentialPublicKeyBytes;
+
+    const counter = info.counter ?? info.credential?.counter ?? 0;
+
+    if (!credentialID || !credentialPublicKey) {
+        // 🔍 esto te dirá exactamente qué está llegando en Vercel
+        return NextResponse.json(
+            {
+                ok: false,
+                message: "No pude extraer credentialID/publicKey",
+                debug: {
+                    registrationInfoKeys: Object.keys(info || {}),
+                    registrationInfo: info,
+                },
+            },
+            { status: 500 }
+        );
+    }
 
     const creds = await getCreds();
     creds.push({
-        id: bufToB64url(credentialID),
-        publicKey: bufToB64url(credentialPublicKey),
+        id: bufToB64url(credentialID as any),
+        publicKey: bufToB64url(credentialPublicKey as any),
         counter,
     });
 
