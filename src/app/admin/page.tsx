@@ -227,7 +227,9 @@ export default function AdminPage() {
                 setNotice({
                     kind: "error",
                     title: "No se pudo iniciar",
-                    detail: opts?.message || `HTTP ${or.status}`,
+                    detail:
+                        (opts?.message || `HTTP ${or.status}`) +
+                        (opts?.debug ? ` | debug: ${JSON.stringify(opts.debug)}` : ""),
                 });
                 return;
             }
