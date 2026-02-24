@@ -4,34 +4,35 @@ const CREDS_KEY = "admin:webauthn:creds";
 const CHALLENGE_KEY = "admin:webauthn:challenge";
 
 export type StoredCredential = {
-    id: string;       // base64url
+    id: string;        // base64url
     publicKey: string; // base64url
     counter: number;
 };
 
 export async function getCreds(): Promise<StoredCredential[]> {
-    console.log("ENV", process.env.VERCEL_ENV);
-    console.log(
-        "REDIS",
-        (process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || "").slice(0, 35)
-    );
-    console.log("KEY", CREDS_KEY);
+    const raw = await redis.get(CREDS_KEY);
 
-    const raw = await redis.get<string>(CREDS_KEY);
     if (!raw) return [];
-    try { return JSON.parse(raw); } catch { return []; }
+
+    // Upstash puede devolverte el valor ya como objeto/array
+    if (Array.isArray(raw)) return raw as StoredCredential[];
+
+    if (typeof raw === "string") {
+        try {
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? (parsed as StoredCredential[]) : [];
+        } catch {
+            return [];
+        }
+    }
+
+    // si viniera como objeto raro
+    return [];
 }
 
 export async function setCreds(creds: StoredCredential[]) {
-    console.log("ENV", process.env.VERCEL_ENV);
-    console.log(
-        "REDIS",
-        (process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || "").slice(0, 35)
-    );
-    console.log("KEY", CREDS_KEY);
-    console.log("SET CREDS LEN", creds.length);
-
-    await redis.set(CREDS_KEY, JSON.stringify(creds));
+    // guarda como JSON nativo (no string)
+    await redis.set(CREDS_KEY, creds);
 }
 
 export async function setChallenge(challenge: string) {
@@ -39,7 +40,8 @@ export async function setChallenge(challenge: string) {
 }
 
 export async function getChallenge() {
-    return (await redis.get<string>(CHALLENGE_KEY)) || null;
+    const v = await redis.get(CHALLENGE_KEY);
+    return typeof v === "string" ? v : (v as any) || null;
 }
 
 export async function clearChallenge() {
