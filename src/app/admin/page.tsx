@@ -307,7 +307,9 @@ export default function AdminPage() {
                 setNotice({
                     kind: "error",
                     title: "No se pudo registrar",
-                    detail: data?.message || `HTTP ${rv.status}`,
+                    detail:
+                        (data?.message || `HTTP ${rv.status}`) +
+                        (data?.debug ? ` | debug: ${JSON.stringify(data.debug)}` : ""),
                 });
                 return;
             }
@@ -316,8 +318,9 @@ export default function AdminPage() {
             setNotice({
                 kind: "success",
                 title: "Passkey registrada",
-                detail: "Ya puedes entrar con Face ID / Huella.",
+                detail: `Guardada en servidor. Total: ${data?.count ?? "?"}`,
             });
+
         } catch (e: any) {
             console.error("PASSKEY REGISTER ERROR", e);
             setNotice({

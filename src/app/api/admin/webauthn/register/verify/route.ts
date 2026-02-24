@@ -2,9 +2,9 @@ export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { verifyRegistrationResponse } from "@simplewebauthn/server";
+import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import { clearChallenge, getChallenge, getCreds, setCreds } from "@/lib/webauthnStore";
 import { requireAdmin } from "@/lib/requireAdmin";
-import { toB64url } from "@/lib/b64url";
 
 export async function POST(req: Request) {
     const guard = await requireAdmin(req);
@@ -36,7 +36,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, message: "registrationInfo vacío" }, { status: 500 });
     }
 
-    // Compat: nombres cambian según versión
     const credentialID =
         info.credentialID ??
         info.credentialId ??
@@ -53,30 +52,27 @@ export async function POST(req: Request) {
 
     const counter = info.counter ?? info.credential?.counter ?? 0;
 
-    // Normaliza a base64url (string)
-    const idB64url = toB64url(credentialID);
-    const pkB64url = toB64url(credentialPublicKey);
-
-    if (!idB64url || !pkB64url) {
+    if (!credentialID || !credentialPublicKey) {
         return NextResponse.json(
             {
                 ok: false,
-                message: "No pude normalizar credenciales",
+                message: "registrationInfo incompleto",
                 debug: { keys: Object.keys(info || {}), hasId: !!credentialID, hasPk: !!credentialPublicKey },
             },
             { status: 500 }
         );
     }
 
-    const creds = await getCreds();
+    const idB64url = isoBase64URL.fromBuffer(credentialID);
+    const pkB64url = isoBase64URL.fromBuffer(credentialPublicKey);
 
-    // evita duplicados
-    const exists = creds.some((c) => c.id === idB64url);
-    if (!exists) {
+    const creds = await getCreds();
+    if (!creds.some((c) => c.id === idB64url)) {
         creds.push({ id: idB64url, publicKey: pkB64url, counter });
         await setCreds(creds);
     }
 
     await clearChallenge();
-    return NextResponse.json({ ok: true });
+    const after = await getCreds();
+    return NextResponse.json({ ok: true, count: after.length });
 }
