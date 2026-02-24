@@ -34,7 +34,9 @@ export async function GET() {
         }
 
         const creds = await getCreds();
-
+        if (!creds.length) {
+            return NextResponse.json({ ok: false, message: "No hay passkey registrada en el servidor" }, { status: 400 });
+        }
         const options = await generateAuthenticationOptions({
             rpID,
             userVerification: "preferred",

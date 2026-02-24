@@ -10,32 +10,48 @@ export type StoredCredential = {
 };
 
 export async function getCreds(): Promise<StoredCredential[]> {
-    const raw = await redis.get(CREDS_KEY);
+    const raw: any = await redis.get(CREDS_KEY);
     if (!raw) return [];
 
-    const arr = Array.isArray(raw)
-        ? raw
-        : typeof raw === "string"
-            ? (() => { try { return JSON.parse(raw); } catch { return []; } })()
-            : [];
+    // 1) Si ya viene como array, listo
+    if (Array.isArray(raw)) {
+        return raw
+            .filter((c: any) => c?.id && c?.publicKey)
+            .map((c: any) => ({ id: String(c.id), publicKey: String(c.publicKey), counter: Number(c.counter ?? 0) }));
+    }
 
-    if (!Array.isArray(arr)) return [];
+    // 2) Si viene como string JSON, parsea
+    if (typeof raw === "string") {
+        try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                return parsed
+                    .filter((c: any) => c?.id && c?.publicKey)
+                    .map((c: any) => ({ id: String(c.id), publicKey: String(c.publicKey), counter: Number(c.counter ?? 0) }));
+            }
+            return [];
+        } catch {
+            return [];
+        }
+    }
 
-    // ✅ Normaliza y filtra basura
-    const norm = arr
-        .map((c: any) => ({
-            id: c?.id ?? c?.credentialID ?? c?.credentialId ?? null,
-            publicKey: c?.publicKey ?? c?.credentialPublicKey ?? c?.credentialPublicKeyBytes ?? null,
-            counter: typeof c?.counter === "number" ? c.counter : 0,
-        }))
-        .filter((c: any) => !!c.id && !!c.publicKey);
+    // 3) Si viene como objeto (caso Upstash raro), intenta convertirlo a array
+    if (typeof raw === "object") {
+        // Caso: {0:{...},1:{...}} o similar
+        const vals = Object.values(raw);
+        if (vals.length && vals.every((v: any) => typeof v === "object")) {
+            return vals
+                .filter((c: any) => c?.id && c?.publicKey)
+                .map((c: any) => ({ id: String(c.id), publicKey: String(c.publicKey), counter: Number(c.counter ?? 0) }));
+        }
+    }
 
-    return norm as StoredCredential[];
+    return [];
 }
 
 export async function setCreds(creds: StoredCredential[]) {
-    // guarda como JSON nativo (no string)
-    await redis.set(CREDS_KEY, creds);
+    // ✅ Guarda SIEMPRE como string, así no hay ambigüedad en el tipo al leer
+    await redis.set(CREDS_KEY, JSON.stringify(creds));
 }
 
 export async function setChallenge(challenge: string) {
