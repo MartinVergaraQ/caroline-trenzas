@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/requireAdmin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
@@ -11,14 +12,10 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET!,
 });
 
-const ALLOWED_PREFIXES = ["cornrows-", "boxer-", "dutch-", "twist-", "custom-"];
-const ALLOWED_FOLDERS = ["caroline/galeria/", "caroline/servicios/"];
+const ALLOWED_FOLDERS = ["caroline/galeria", "caroline/servicios"];
 
 function allowedPublicId(publicId: string) {
-    if (ALLOWED_FOLDERS.some((p) => publicId.startsWith(p))) return true;
-    if (ALLOWED_PREFIXES.some((p) => publicId.startsWith(p))) return true;
-    if (ALLOWED_PREFIXES.some((p) => publicId.includes(`/${p}`))) return true;
-    return false;
+    return ALLOWED_FOLDERS.some((f) => publicId === f || publicId.startsWith(f + "/"));
 }
 
 export async function POST(req: Request) {
@@ -48,10 +45,10 @@ export async function POST(req: Request) {
 
         if (!resourceType && result?.result === "not found") {
             const result2 = await cloudinary.uploader.destroy(publicId, { resource_type: "video", invalidate: true });
-            return NextResponse.json({ ok: true, result: result2 });
+            return NextResponse.json({ ok: true, result: result2 }, { headers: { "Cache-Control": "no-store" } });
         }
 
-        return NextResponse.json({ ok: true, result });
+        return NextResponse.json({ ok: true, result }, { headers: { "Cache-Control": "no-store" } });
     } catch (e: any) {
         return NextResponse.json({ ok: false, message: e?.message || "Error eliminando" }, { status: 500 });
     }
