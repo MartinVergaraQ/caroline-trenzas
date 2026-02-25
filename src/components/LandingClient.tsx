@@ -3,7 +3,7 @@
 import Modal from "@/components/modal";
 import WhatsAppLeadForm from "@/components/WhatsAppLeadForm";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type GalleryItem = {
     publicId: string;
@@ -19,14 +19,14 @@ const WA_PHONE = "+56974011961";
 
 const buildWhatsAppText = (service?: string) => {
     const s = service ? `Hola! Quiero cotizar ${service}.` : "Hola! Quiero cotizar un servicio.";
-    const extra = service ? `\n\nSi puedes, mándame una foto de referencia de ${service}.` : "";
+    const extra = service ? `\n\nSi puedes, envíame una foto del estilo de ${service} que te gustaría.` : "";
     return (
         `${s}${extra}\n\nPara cotizar, te envío:` +
         `\n• Foto de mi cabello (opcional, pero ayuda mucho)` +
         `\n• Largo (corto/medio/largo o foto)` +
         `\n• Idea / referencia` +
         `\n• Fecha y comuna` +
-        `\n\n⏱ Te respondemos en ~2 horas.` +
+        `\n\n⏱ Respondemos lo antes posible (máximo 2 horas).` +
         `\n💳 Se pide abono para reservar (te explico monto y datos).`
     );
 };
@@ -120,9 +120,15 @@ export default function LandingClient() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [openPhoto, photos.length]);
 
+    const photoIndexByKey = useMemo(() => {
+        const m = new Map<string, number>();
+        photos.forEach((p, i) => m.set(p.publicId || p.src, i));
+        return m;
+    }, [photos]);
+
     useEffect(() => {
         setLoadingGallery(true);
-        fetch("/api/gallery", { cache: "no-store" })
+        fetch("/api/gallery")
             .then((r) => r.json())
             .then((data) => {
                 const items = (data.items || []).map((x: any) => ({
@@ -150,7 +156,7 @@ export default function LandingClient() {
 
     useEffect(() => {
         setLoadingServices(true);
-        fetch("/api/services", { cache: "no-store" })
+        fetch("/api/services")
             .then((r) => r.json())
             .then((data) => setServices(data.services || []))
             .catch(() => setServices([]))
@@ -434,7 +440,7 @@ export default function LandingClient() {
                                     </p>
 
                                     <ul className="mt-3 text-xs text-[#89616f] space-y-1">
-                                        <li>⏱ Te respondemos en ~2 horas</li>
+                                        <li>⏱ Respondemos lo antes posible (máximo 2 horas)</li>
                                         <li>📷 Qué enviar: foto + largo + idea</li>
                                         <li>📍 Fecha y comuna</li>
                                     </ul>
@@ -642,7 +648,8 @@ export default function LandingClient() {
                                                     setActiveReel(v);
                                                     setOpenReel(true);
                                                 }}
-                                                className="group text-left rounded-2xl border border-primary/10 bg-background-light overflow-hidden hover:shadow-xl transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 flex flex-col h-full" aria-label="Abrir video"
+                                                className="group text-left rounded-2xl border border-primary/10 bg-background-light overflow-hidden hover:shadow-xl transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 flex flex-col h-full"
+                                                aria-label="Abrir video"
                                             >
                                                 <div className="relative bg-black h-[360px] sm:h-[420px] lg:h-[460px]">
                                                     <video
@@ -706,25 +713,28 @@ export default function LandingClient() {
                                 </div>
 
                                 <div className="masonry">
-                                    {visible.map((item, idx) => (
-                                        <button
-                                            key={item.publicId || item.src}
-                                            type="button"
-                                            className="masonry-item text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-xl"
-                                            onClick={() => openAt(idx)}
-                                            aria-label="Abrir foto"
-                                        >
-                                            <Image
-                                                src={item.src}
-                                                alt={item.alt || "Trabajo de trenzas"}
-                                                width={item.width || 1200}
-                                                height={item.height || 1600}
-                                                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                                                className="w-full h-auto rounded-xl hover:opacity-95 transition-opacity"
-                                                loading="lazy"
-                                            />
-                                        </button>
-                                    ))}
+                                    {visible.map((item) => {
+                                        const key = item.publicId || item.src;
+                                        return (
+                                            <button
+                                                key={key}
+                                                type="button"
+                                                className="masonry-item text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-xl"
+                                                onClick={() => openAt(photoIndexByKey.get(key) ?? 0)}
+                                                aria-label="Abrir foto"
+                                            >
+                                                <Image
+                                                    src={item.src}
+                                                    alt={item.alt || "Trabajo de trenzas"}
+                                                    width={item.width || 1200}
+                                                    height={item.height || 1600}
+                                                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                                    className="w-full h-auto rounded-xl hover:opacity-95 transition-opacity"
+                                                    loading="lazy"
+                                                />
+                                            </button>
+                                        );
+                                    })}
                                 </div>
 
                                 {/* Cargar más */}

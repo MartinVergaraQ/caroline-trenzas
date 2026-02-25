@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 
 declare global {
@@ -12,8 +12,8 @@ declare global {
 const SERVICES = [
     { id: "cornrows", title: "Cornrows" },
     { id: "boxer", title: "Boxeadoras" },
-    { id: "dutch", title: "Peinados" },
-    { id: "Rulos", title: "Rulos" },
+    { id: "peinados", title: "Peinados" },
+    { id: "rulos", title: "Rulos" },
     { id: "custom", title: "Diseños Personalizados" },
 ];
 
@@ -23,7 +23,7 @@ type UploadedItem = {
     type: "gallery" | "services";
     mediaType?: "image" | "video";
     serviceId?: string;
-    createdAt?: string; // 👈 lo agregamos para "Hace X min"
+    createdAt?: string;
 };
 
 type MediaItem = {
@@ -34,12 +34,6 @@ type MediaItem = {
     width: number;
     height: number;
     mediaType?: "image" | "video";
-};
-
-type Notice = null | {
-    kind: "success" | "error" | "info";
-    title: string;
-    detail?: string;
 };
 
 type ConfirmDeleteState = null | {
@@ -56,6 +50,8 @@ type Toast = {
     title: string;
     detail?: string;
 };
+
+type UploadingKind = null | "gallery" | "services" | "reel" | "video";
 
 export default function AdminPage() {
     const [authed, setAuthed] = useState(false);
@@ -79,6 +75,8 @@ export default function AdminPage() {
     const presetServices = process.env.NEXT_PUBLIC_CLOUDINARY_SERVICES_PRESET || "";
     const presetGalleryVideo = process.env.NEXT_PUBLIC_CLOUDINARY_GALLERY_VIDEO_PRESET || "";
 
+    const [uploading, setUploading] = useState<UploadingKind>(null);
+    const isUploading = uploading !== null;
     const galleryVideos = galleryLatest.filter(x => (x.mediaType ?? "image") === "video").length;
     const galleryImages = galleryLatest.length - galleryVideos;
     const [loadingLogin, setLoadingLogin] = useState(false);
@@ -86,8 +84,11 @@ export default function AdminPage() {
     const [canPasskey, setCanPasskey] = useState<boolean | null>(null);
     const [loadingPasskey, setLoadingPasskey] = useState(false);
     const [hasPasskey, setHasPasskey] = useState(false);
-
     const [toasts, setToasts] = useState<Toast[]>([]);
+    const uploadTimeoutRef = useRef<number | null>(null);
+    const [uploadStartedAt, setUploadStartedAt] = useState<number | null>(null);
+    const canReset = isUploading && uploadStartedAt && Date.now() - uploadStartedAt > 20000;
+    const disableServicesButton = uploading !== null && uploading !== "services";
 
     function pushToast(kind: ToastKind, title: string, detail?: string) {
         const id = (globalThis.crypto?.randomUUID?.() ?? String(Date.now() + Math.random()));
@@ -130,6 +131,11 @@ export default function AdminPage() {
             </div>
         );
     }
+    useEffect(() => {
+        return () => {
+            if (uploadTimeoutRef.current) window.clearTimeout(uploadTimeoutRef.current);
+        };
+    }, []);
 
     useEffect(() => {
         let alive = true;
@@ -181,10 +187,38 @@ export default function AdminPage() {
         return () => clearTimeout(t);
     }, []);
 
+    function startUpload(kind: UploadingKind) {
+        setUploading(kind);
+        setUploadStartedAt(Date.now());
+        if (uploadTimeoutRef.current) window.clearTimeout(uploadTimeoutRef.current);
+
+        uploadTimeoutRef.current = window.setTimeout(() => {
+            setUploading((cur) => (cur === kind ? null : cur));
+            uploadTimeoutRef.current = null;
+        }, 10 * 60 * 1000);
+    }
+
+    function stopUpload(kind?: UploadingKind) {
+        setUploading((cur) => (kind && cur !== kind ? cur : null));
+        setUploadStartedAt(null);
+        if (uploadTimeoutRef.current) {
+            window.clearTimeout(uploadTimeoutRef.current);
+            uploadTimeoutRef.current = null;
+        }
+    }
+
     const selectedTitle = useMemo(
         () => SERVICES.find((x) => x.id === selectedServiceId)?.title || "Servicio",
         [selectedServiceId]
     );
+
+    const uploadingLabel = useMemo(() => {
+        if (uploading === "gallery") return "Subiendo foto a Galería…";
+        if (uploading === "services") return `Subiendo fotos de ${selectedTitle}…`;
+        if (uploading === "reel") return "Subiendo Reel…";
+        if (uploading === "video") return "Subiendo video…";
+        return "";
+    }, [uploading, selectedTitle]);
 
     // ---------- helpers ----------
     function formatTimeAgo(iso?: string) {
@@ -253,6 +287,7 @@ export default function AdminPage() {
         setGalleryLatest([]);
         setServicesLatest([]);
         setConfirmDelete(null);
+        stopUpload();
     }
 
     async function passkeyLogin() {
@@ -429,17 +464,22 @@ export default function AdminPage() {
             contextLabel: input.contextLabel,
         });
     }
+
     function openVideoUploader(asReel = false) {
+        const kind: UploadingKind = asReel ? "reel" : "video";
+
+        if (isUploading) {
+            pushToast("info", "Ya se está subiendo", "Espera a que termine la subida actual.");
+            return;
+        }
         if (!cloudName) {
             pushToast("error", "Faltan variables", "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME no está en .env / Vercel.");
             return;
         }
-
         if (!presetGalleryVideo) {
             pushToast("error", "Falta preset de video", "NEXT_PUBLIC_CLOUDINARY_GALLERY_VIDEO_PRESET no está seteado.");
             return;
         }
-
         if (!window.cloudinary) {
             pushToast("error", "No cargó el widget", "Revisa que el Script del widget esté en layout.tsx.");
             return;
@@ -449,33 +489,44 @@ export default function AdminPage() {
             cloudName,
             uploadPreset: presetGalleryVideo,
             folder: "caroline/galeria",
-
             multiple: true,
             maxFiles: 10,
-
             sources: ["local", "camera", "google_drive"],
             clientAllowedFormats: ["mp4", "mov", "webm"],
             cropping: false,
             showAdvancedOptions: false,
-
             resourceType: "video",
-
             showCompletedButton: true,
             singleUploadAutoClose: false,
-
-            // tags para que /api/gallery lo encuentre
             tags: asReel ? ["gallery", "video", "reel"] : ["gallery", "video"],
             context: { album: "gallery", kind: asReel ? "reel" : "video" },
         };
+
+        startUpload(kind);
+
+        let successCount = 0;
 
         const widget = window.cloudinary.createUploadWidget(options, async (error: any, result: any) => {
             if (error) {
                 console.error("CLOUDINARY VIDEO ERROR:", error);
                 pushToast("error", "Error subiendo video", error?.message || "Mira consola.");
+                stopUpload(kind);
+                return;
+            }
+
+            if (result?.event === "abort") {
+                stopUpload(kind);
+                return;
+            }
+
+            if (result?.event === "queues-start") {
+                pushToast("info", "Subida iniciada", "No cierres la pestaña.");
                 return;
             }
 
             if (result?.event === "success") {
+                successCount += 1;
+
                 const info = result.info ?? {};
                 const publicId = String(info.public_id ?? "");
                 const src = String(info.secure_url ?? "");
@@ -483,27 +534,29 @@ export default function AdminPage() {
 
                 setSessionUploads((prev) => {
                     const next: UploadedItem[] = [
-                        {
-                            publicId,
-                            src,
-                            type: "gallery",
-                            mediaType: "video",
-                            createdAt,
-                        },
+                        { publicId, src, type: "gallery", mediaType: "video", createdAt },
                         ...prev,
                     ];
                     return next.slice(0, 24);
                 });
 
-                pushToast(
-                    "success",
-                    asReel ? "Reel subido" : "Video subido",
-                    asReel
-                        ? "Se subió a Galería (destacado)."
-                        : "Se subió a Galería (video).",
-                );
+                // NO refreshLatest aquí (si subes 10, no queremos 10 refresh)
+                pushToast("success", asReel ? "Reel subido" : "Video subido", "Se subió a Galería.");
+                return;
+            }
 
-                await refreshLatest();
+            if (result?.event === "queues-end") {
+                if (successCount > 0) await refreshLatest();
+                stopUpload(kind);
+                pushToast("success", "Listo", `Se subieron ${successCount} video(s).`);
+                return;
+            }
+
+            if (result?.event === "close") {
+                // Si hubo subidas, espera queues-end (a veces llega después)
+                if (successCount > 0) return;
+                stopUpload(kind);
+                return;
             }
         });
 
@@ -511,6 +564,11 @@ export default function AdminPage() {
     }
     // ---------- uploader ----------
     function openUploader(type: "gallery" | "services") {
+        if (isUploading) {
+            pushToast("info", "Ya se está subiendo", "Espera a que termine la subida actual.");
+            return;
+        }
+
         if (!cloudName) {
             pushToast("error", "Faltan variables", "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME no está en .env / Vercel.");
             return;
@@ -523,7 +581,7 @@ export default function AdminPage() {
                 "Falta preset",
                 type === "gallery"
                     ? "NEXT_PUBLIC_CLOUDINARY_GALLERY_PRESET no está seteado."
-                    : "NEXT_PUBLIC_CLOUDINARY_SERVICES_PRESET no está seteado.",
+                    : "NEXT_PUBLIC_CLOUDINARY_SERVICES_PRESET no está seteado."
             );
             return;
         }
@@ -559,14 +617,47 @@ export default function AdminPage() {
 
         if (!isGallery) options.public_id_prefix = `${selectedServiceId}-`;
 
+        // Solo aquí marcamos "subiendo": ya validaste todo
+        startUpload(type);
+
+        let successCount = 0;
         const widget = window.cloudinary.createUploadWidget(options, async (error: any, result: any) => {
             if (error) {
                 console.error("CLOUDINARY ERROR:", error);
                 pushToast("error", "Error subiendo", error?.message || "Mira consola.");
+                stopUpload(type);
+                return;
+            }
+
+            if (result?.event === "abort") {
+                stopUpload(type);
+                return;
+            }
+
+            if (result?.event === "close") {
+                // Si es multi y ya hubo uploads, espera queues-end (más confiable)
+                if (!isGallery && successCount > 0) return;
+                stopUpload(type);
+                return;
+            }
+
+            if (result?.event === "queues-start") {
+                pushToast("info", "Subida iniciada", "No cierres la pestaña.");
+            }
+
+            if (result?.event === "queues-end") {
+                // Para services: refresca una vez al final
+                if (!isGallery && successCount > 0) {
+                    await refreshLatest();
+                    pushToast("success", "Listo", `Se subieron ${successCount} foto(s) a Servicios (${selectedTitle}).`);
+                }
+                stopUpload(type);
                 return;
             }
 
             if (result?.event === "success") {
+                successCount += 1;
+
                 const info = result.info || {};
                 const publicId = String(info.public_id || "");
                 const src = String(info.secure_url || "");
@@ -587,13 +678,16 @@ export default function AdminPage() {
                     return next.slice(0, 24);
                 });
 
-                pushToast(
-                    "success",
-                    "Subida OK",
-                    type === "services" ? `Se subió a Servicios (${selectedTitle}).` : "Se subió a Galería.",
-                );
+                // Toast por cada success está OK (pero si subes 30, podría ser spam; tú limitas a 4 toasts)
+                if (isGallery) {
+                    pushToast("success", "Subida OK", "Se subió a Galería.");
+                }
 
-                await refreshLatest();
+                // Para galería (1 foto): refresca al tiro
+                if (isGallery) {
+                    await refreshLatest();
+                    stopUpload(type);
+                }
             }
         });
 
@@ -856,6 +950,21 @@ export default function AdminPage() {
             <ConfirmDeleteModal state={confirmDelete} />
 
             <div className="max-w-5xl mx-auto bg-white border rounded-2xl p-6 shadow-sm">
+                {isUploading ? (
+                    <div className="mb-4 rounded-2xl border bg-primary/5 p-4 flex items-center gap-3">
+                        <span className="inline-block h-4 w-4 animate-spin rounded-full border border-primary/30 border-t-primary" />
+                        <p className="text-sm font-bold text-[#181113]">{uploadingLabel || "Subiendo…"}</p>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                pushToast("info", "Subida en curso", "Si cerraste el widget, presiona 'Reset' para desbloquear.");
+                            }}
+                            className="ml-auto rounded-full border px-4 py-2 text-xs font-bold hover:bg-black/5"
+                        >
+                            ¿Qué pasa?
+                        </button>
+                    </div>
+                ) : null}
                 <div className="flex items-center justify-between gap-4">
                     <div>
                         <h1 className="text-2xl font-black mb-1">Subir fotos</h1>
@@ -888,14 +997,32 @@ export default function AdminPage() {
                         ) : null}
                         <button
                             onClick={refreshLatest}
-                            className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5"
-                            disabled={loadingLatest}
+                            disabled={loadingLatest || isUploading}
+                            className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
                         >
                             {loadingLatest ? "Actualizando..." : "Actualizar"}
                         </button>
-                        <button onClick={logout} className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5">
+                        <button
+                            onClick={logout}
+                            disabled={isUploading}
+                            className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
+                        >
                             Salir
                         </button>
+                        {isUploading ? (
+                            <button
+                                type="button"
+                                disabled={!canReset}
+                                onClick={() => {
+                                    stopUpload();
+                                    pushToast("info", "Estado reiniciado", "Se desbloquearon los botones.");
+                                }}
+                                className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-50"
+                                title={!canReset ? "Espera 20s por si la subida está en curso" : "Úsalo si quedó pegado"}
+                            >
+                                Reset
+                            </button>
+                        ) : null}
                     </div>
                 </div>
 
@@ -911,16 +1038,19 @@ export default function AdminPage() {
 
                         <button
                             onClick={() => openUploader("gallery")}
-                            className="mt-4 w-full rounded-xl bg-primary text-white font-bold py-3"
+                            disabled={isUploading}
+                            className="mt-4 w-full rounded-xl bg-primary text-white font-bold py-3 disabled:opacity-60"
                         >
-                            Subir 1 foto a Galería
+                            {uploading === "gallery" ? "Subiendo..." : "Subir 1 foto a Galería"}
                         </button>
+
                         <button
                             onClick={() => openVideoUploader(true)}
-                            className="mt-2 w-full rounded-xl border py-3 font-bold hover:bg-black/5"
+                            disabled={isUploading}
+                            className="mt-2 w-full rounded-xl border py-3 font-bold hover:bg-black/5 disabled:opacity-60"
                             title="Estos aparecen arriba como Reels en la landing"
                         >
-                            ⭐ Subir Reel (destacado)
+                            {uploading === "reel" ? "Subiendo..." : "⭐ Subir Reel (destacado)"}
                         </button>
                     </div>
 
@@ -935,6 +1065,7 @@ export default function AdminPage() {
                         <select
                             value={selectedServiceId}
                             onChange={(e) => setSelectedServiceId(e.target.value)}
+                            disabled={uploading === "services"}
                             className="w-full rounded-xl border px-4 py-3 text-sm"
                         >
                             {SERVICES.map((s) => (
@@ -946,9 +1077,17 @@ export default function AdminPage() {
 
                         <button
                             onClick={() => openUploader("services")}
-                            className="mt-4 w-full rounded-xl bg-primary text-white font-bold py-3"
+                            disabled={disableServicesButton || uploading === "services"}
+                            title={
+                                disableServicesButton
+                                    ? "Ya hay otra subida en curso. Termínala primero."
+                                    : uploading === "services"
+                                        ? "Subiendo fotos…"
+                                        : ""
+                            }
+                            className="mt-4 w-full rounded-xl bg-primary text-white font-bold py-3 disabled:opacity-60"
                         >
-                            Subir fotos de {selectedTitle}
+                            {uploading === "services" ? "Subiendo fotos…" : `Subir fotos de ${selectedTitle}`}
                         </button>
 
                         <p className="mt-3 text-xs text-[#89616f]">
