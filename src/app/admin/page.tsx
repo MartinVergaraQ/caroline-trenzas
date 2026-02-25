@@ -236,6 +236,7 @@ export default function AdminPage() {
             setAuthed(true);
             setPwd("");
             pushToast("success", "Listo", "Ya puedes subir fotos");
+            await refreshLatest();
         } finally {
             setLoadingLogin(false);
         }
@@ -345,7 +346,7 @@ export default function AdminPage() {
             fetch("/api/admin/webauthn/status", { cache: "no-store" })
                 .then((r) => r.json())
                 .then((s) => setHasPasskey(!!s?.hasPasskey))
-                .catch(() => { });
+                .catch(() => setHasPasskey(false));
 
         } catch (e: any) {
             console.error("PASSKEY REGISTER ERROR", e);
@@ -372,6 +373,11 @@ export default function AdminPage() {
                 fetch("/api/admin/media?type=services", { credentials: "include", cache: "no-store" }),
             ]);
 
+            if (rg.status === 401 || rs.status === 401) {
+                setAuthed(false);
+                pushToast("error", "Sesión expirada", "Vuelve a entrar con Face ID o clave.");
+                return;
+            }
             if (!rg.ok) throw new Error(`gallery ${rg.status}`);
             if (!rs.ok) throw new Error(`services ${rs.status}`);
 
@@ -860,14 +866,25 @@ export default function AdminPage() {
 
                     <div className="flex gap-2">
                         {canPasskey ? (
-                            <button
-                                type="button"
-                                onClick={passkeyRegister}
-                                disabled={loadingPasskey}
-                                className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
-                            >
-                                {loadingPasskey ? "Registrando..." : "Registrar Face ID / Huella"}
-                            </button>
+                            hasPasskey ? (
+                                <button
+                                    type="button"
+                                    disabled
+                                    className="rounded-full border px-4 py-2 text-sm font-bold opacity-60 cursor-not-allowed"
+                                    title="Ya hay una passkey registrada"
+                                >
+                                    ✅ Face ID / Huella activa
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={passkeyRegister}
+                                    disabled={loadingPasskey}
+                                    className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
+                                >
+                                    {loadingPasskey ? "Registrando..." : "Registrar Face ID / Huella"}
+                                </button>
+                            )
                         ) : null}
                         <button
                             onClick={refreshLatest}

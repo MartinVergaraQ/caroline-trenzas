@@ -5,11 +5,22 @@ import { useEffect, useId, useRef } from "react";
 type ModalProps = {
     open: boolean;
     title?: string;
+    subtitle?: string;
+    icon?: string; // Material Symbols name, ej: "chat", "play_circle", "photo"
+    closeOnBackdrop?: boolean;
     onClose: () => void;
     children: React.ReactNode;
 };
 
-export default function Modal({ open, title, onClose, children }: ModalProps) {
+export default function Modal({
+    open,
+    title,
+    subtitle,
+    icon = "chat",
+    closeOnBackdrop = true,
+    onClose,
+    children,
+}: ModalProps) {
     const headingId = useId();
     const panelRef = useRef<HTMLDivElement | null>(null);
 
@@ -23,8 +34,7 @@ export default function Modal({ open, title, onClose, children }: ModalProps) {
         document.addEventListener("keydown", onKeyDown);
         document.body.style.overflow = "hidden";
 
-        // Enfoca el panel para que el teclado/foco no quede perdido
-        // (y para que Escape/Tab se sientan más “app”).
+        // foco al panel
         setTimeout(() => panelRef.current?.focus(), 0);
 
         return () => {
@@ -45,7 +55,7 @@ export default function Modal({ open, title, onClose, children }: ModalProps) {
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-                onClick={onClose}
+                onClick={() => (closeOnBackdrop ? onClose() : null)}
             />
 
             {/* Panel (bottom sheet en mobile, centrado en md+) */}
@@ -59,8 +69,9 @@ export default function Modal({ open, title, onClose, children }: ModalProps) {
                     <div className="flex items-center justify-between px-6 py-4 border-b border-[#f4f0f2]">
                         <div className="flex items-center gap-3">
                             <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                <span className="material-symbols-outlined">chat</span>
+                                <span className="material-symbols-outlined">{icon}</span>
                             </div>
+
                             <div>
                                 <p
                                     id={headingId}
@@ -68,7 +79,12 @@ export default function Modal({ open, title, onClose, children }: ModalProps) {
                                 >
                                     {title ?? "Cotizar por WhatsApp"}
                                 </p>
-                                <p className="text-xs text-[#89616f]">Respuesta rápida, sin vueltas.</p>
+
+                                {subtitle ? (
+                                    <p className="text-xs text-[#89616f]">{subtitle}</p>
+                                ) : (
+                                    <p className="text-xs text-[#89616f]">Respuesta rápida, sin vueltas.</p>
+                                )}
                             </div>
                         </div>
 

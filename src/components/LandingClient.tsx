@@ -15,7 +15,54 @@ type GalleryItem = {
     height?: number;
     tags?: string[];
 };
+const WA_PHONE = "+56974011961";
 
+const buildWhatsAppText = (service?: string) => {
+    const s = service ? `Hola! Quiero cotizar ${service}.` : "Hola! Quiero cotizar un servicio.";
+    const extra = service ? `\n\nSi puedes, mándame una foto de referencia de ${service}.` : "";
+    return (
+        `${s}${extra}\n\nPara cotizar, te envío:` +
+        `\n• Foto de mi cabello (opcional, pero ayuda mucho)` +
+        `\n• Largo (corto/medio/largo o foto)` +
+        `\n• Idea / referencia` +
+        `\n• Fecha y comuna` +
+        `\n\n⏱ Te respondemos en ~2 horas.` +
+        `\n💳 Se pide abono para reservar (te explico monto y datos).`
+    );
+};
+
+const waLink = (phone: string, text: string) =>
+    `https://wa.me/${phone.replace(/[^\d]/g, "")}?text=${encodeURIComponent(text)}`;
+
+function FAQAccordion({ items }: { items: { q: string; a: string }[] }) {
+    const [open, setOpen] = useState<number | null>(0);
+
+    return (
+        <div className="space-y-2">
+            {items.map((it, i) => {
+                const isOpen = open === i;
+                return (
+                    <div key={it.q} className="rounded-2xl border border-primary/10 bg-white">
+                        <button
+                            type="button"
+                            onClick={() => setOpen(isOpen ? null : i)}
+                            className="w-full px-5 py-4 text-left flex items-center justify-between gap-4"
+                        >
+                            <span className="font-bold text-[#181113]">{it.q}</span>
+                            <span className="text-[#89616f] text-lg">{isOpen ? "–" : "+"}</span>
+                        </button>
+
+                        {isOpen && (
+                            <div className="px-5 pb-5 text-sm text-[#89616f] leading-relaxed">
+                                {it.a}
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
 export default function LandingClient() {
     const [open, setOpen] = useState(false);
 
@@ -26,6 +73,52 @@ export default function LandingClient() {
     const [visiblePhotos, setVisiblePhotos] = useState(10);
     const [openReel, setOpenReel] = useState(false);
     const [activeReel, setActiveReel] = useState<GalleryItem | null>(null);
+    const [selectedService, setSelectedService] = useState<string | undefined>(undefined);
+    const [openPhoto, setOpenPhoto] = useState(false);
+    const [activePhotoIndex, setActivePhotoIndex] = useState<number>(0);
+    const [zoom, setZoom] = useState(false);
+    const waHref = waLink(WA_PHONE, buildWhatsAppText(selectedService));
+
+    const photos = gallery
+        .filter((x) => x.mediaType !== "video")
+        .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
+    const openAt = (idx: number) => {
+        setActivePhotoIndex(idx);
+        setZoom(false);
+        setOpenPhoto(true);
+    };
+
+    const closePhoto = () => {
+        setOpenPhoto(false);
+        setZoom(false);
+    };
+
+    const prevPhoto = () => {
+        if (photos.length === 0) return;
+        setActivePhotoIndex((i) => (i - 1 + photos.length) % photos.length);
+        setZoom(false);
+    };
+
+    const nextPhoto = () => {
+        if (photos.length === 0) return;
+        setActivePhotoIndex((i) => (i + 1) % photos.length);
+        setZoom(false);
+    };
+
+    useEffect(() => {
+        if (!openPhoto) return;
+
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") closePhoto();
+            if (e.key === "ArrowLeft") prevPhoto();
+            if (e.key === "ArrowRight") nextPhoto();
+        };
+
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [openPhoto, photos.length]);
 
     useEffect(() => {
         setLoadingGallery(true);
@@ -52,7 +145,7 @@ export default function LandingClient() {
     }, []);
 
     const [services, setServices] = useState<
-        { id: string; title: string; description: string; image: string }[]
+        { id: string; title: string; description: string; image: string; duration?: string }[]
     >([]);
 
     useEffect(() => {
@@ -64,28 +157,28 @@ export default function LandingClient() {
             .finally(() => setLoadingServices(false));
     }, []);
 
-    const photos = gallery
-        .filter((x) => x.mediaType !== "video")
-        .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-
     const visible = photos.slice(0, visiblePhotos);
     const hasMore = visiblePhotos < photos.length;
 
     return (
         <>
             {/* Modal */}
-            <Modal open={open} onClose={() => setOpen(false)} title="Cotizar por WhatsApp">
-                <WhatsAppLeadForm onSent={() => setOpen(false)} />
+            <Modal
+                open={open}
+                onClose={() => setOpen(false)}
+                title="Cotizar por WhatsApp"
+                subtitle="Respuesta rápida, sin vueltas."
+                icon="chat"
+            >
+                <WhatsAppLeadForm initialService={selectedService} onSent={() => setOpen(false)} />
             </Modal>
-
             {/* Modal para Reels */}
             <Modal
                 open={openReel}
-                onClose={() => {
-                    setOpenReel(false);
-                    setActiveReel(null);
-                }}
+                onClose={() => { setOpenReel(false); setActiveReel(null); }}
                 title="Reel / Video"
+                subtitle="Toca play y súbele el volumen."
+                icon="play_circle"
             >
                 {activeReel ? (
                     <div className="space-y-3">
@@ -98,6 +191,67 @@ export default function LandingClient() {
                                 className="absolute inset-0 h-full w-full object-cover"
                             />
                         </div>
+                    </div>
+                ) : null}
+            </Modal>
+            <Modal
+                open={openPhoto}
+                onClose={closePhoto}
+                title="Foto"
+                subtitle={`${activePhotoIndex + 1} / ${photos.length}`}
+                icon="photo"
+            >
+                {photos.length ? (
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                            <button
+                                type="button"
+                                onClick={prevPhoto}
+                                className="h-10 px-4 rounded-full border border-primary/15 bg-white text-[#181113] text-sm font-bold hover:bg-black/5"
+                            >
+                                ← Anterior
+                            </button>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setZoom((z) => !z)}
+                                    className="h-10 px-4 rounded-full border border-primary/15 bg-white text-[#181113] text-sm font-bold hover:bg-black/5"
+                                >
+                                    {zoom ? "Zoom −" : "Zoom +"}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={nextPhoto}
+                                    className="h-10 px-4 rounded-full border border-primary/15 bg-white text-[#181113] text-sm font-bold hover:bg-black/5"
+                                >
+                                    Siguiente →
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="relative w-full overflow-hidden rounded-2xl bg-black/90">
+                            {/* contenedor con ratio flexible */}
+                            <div className="relative w-full h-[60vh]">
+                                <Image
+                                    src={photos[activePhotoIndex]?.src}
+                                    alt={photos[activePhotoIndex]?.alt || "Trabajo de trenzas"}
+                                    fill
+                                    sizes="100vw"
+                                    className={[
+                                        "object-contain select-none transition-transform duration-200",
+                                        zoom ? "scale-125 cursor-zoom-out" : "scale-100 cursor-zoom-in",
+                                    ].join(" ")}
+                                    onClick={() => setZoom((z) => !z)}
+                                    priority
+                                />
+                            </div>
+                        </div>
+
+                        <p className="text-xs text-[#89616f] text-center">
+                            Tip: flechas del teclado para navegar. Click en la foto para zoom.
+                        </p>
                     </div>
                 ) : null}
             </Modal>
@@ -131,7 +285,7 @@ export default function LandingClient() {
                         </a>
 
                         <button
-                            onClick={() => setOpen(true)}
+                            onClick={() => { setSelectedService(undefined); setOpen(true); }}
                             className="flex min-w-[140px] cursor-pointer items-center justify-center rounded-full h-11 px-6 bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
                             type="button"
                         >
@@ -169,7 +323,7 @@ export default function LandingClient() {
 
                                 <div className="flex flex-wrap gap-4 pt-4">
                                     <button
-                                        onClick={() => setOpen(true)}
+                                        onClick={() => { setSelectedService(undefined); setOpen(true); }}
                                         className="flex items-center justify-center rounded-full h-14 px-8 bg-primary text-white text-base font-bold shadow-xl md:hover:scale-105 transition-transform"
                                         type="button"
                                     >
@@ -205,7 +359,8 @@ export default function LandingClient() {
                             {services.map((s) => (
                                 <div
                                     key={s.id}
-                                    className="group bg-background-light p-4 rounded-xl hover:shadow-xl transition-all duration-300 border border-transparent hover:border-primary/10 h-full flex flex-col"                                >
+                                    className="group bg-background-light p-4 rounded-xl hover:shadow-xl transition-all duration-300 border border-transparent hover:border-primary/10 h-full flex flex-col"
+                                >
                                     {s.image ? (
                                         <Image
                                             src={s.image}
@@ -220,20 +375,40 @@ export default function LandingClient() {
                                         </div>
                                     )}
 
-                                    <h3 className="text-xl font-bold mb-2 line-clamp-1">{s.title}</h3>
+                                    {/* Título + duración */}
+                                    <div className="flex items-start justify-between gap-3 mb-2">
+                                        <h3 className="text-xl font-bold line-clamp-1">{s.title}</h3>
+                                        {s.duration ? (
+                                            <span className="shrink-0 text-[11px] font-bold px-2 py-1 rounded-full bg-primary/10 text-primary">
+                                                ⏱ {s.duration}
+                                            </span>
+                                        ) : null}
+                                    </div>
+
                                     <p className="text-[#89616f] text-sm leading-relaxed line-clamp-3">{s.description}</p>
+
+                                    {/* Botón al fondo */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedService(s.title);
+                                            setOpen(true);
+                                        }}
+                                        className="mt-auto pt-5 w-full"
+                                    >
+                                        <div className="w-full rounded-full h-11 bg-primary text-white text-sm font-bold hover:bg-primary/90 flex items-center justify-center">
+                                            Cotizar {s.title}
+                                        </div>
+                                    </button>
                                 </div>
                             ))}
                         </div>
-
 
                         {services.length === 0 && (
                             <div className="mt-10 rounded-xl border border-primary/10 bg-background-light p-10 text-center">
                                 <p className="text-[#89616f]">Estamos preparando el catálogo de servicios.</p>
                             </div>
                         )}
-
-
                     </div>
                 </section>
 
@@ -246,7 +421,7 @@ export default function LandingClient() {
 
                         <div className="flex flex-col md:flex-row items-center justify-between gap-12 relative">
                             {/* Connector line for desktop */}
-                            <div className="hidden md:block absolute top-1/2 left-0 right-0 h-0.5 bg-primary/20 -translate-y-8 z-0"></div>
+                            <div className="hidden md:block absolute top-1/2 left-0 right-0 h-0.5 bg-primary/20 -translate-y-8 z-0" />
 
                             <div className="flex flex-col items-center text-center space-y-4 z-10 bg-background-light px-4">
                                 <div className="size-16 rounded-full bg-primary text-white flex items-center justify-center shadow-lg">
@@ -254,9 +429,15 @@ export default function LandingClient() {
                                 </div>
                                 <div>
                                     <h4 className="font-bold text-lg">1. Cotiza</h4>
-                                    <p className="text-[#89616f] text-sm max-w-[200px]">
-                                        Envíanos una foto de tu cabello y el estilo que deseas.
+                                    <p className="text-[#89616f] text-sm max-w-[220px]">
+                                        Escríbenos por WhatsApp con tu idea (y ojalá una foto).
                                     </p>
+
+                                    <ul className="mt-3 text-xs text-[#89616f] space-y-1">
+                                        <li>⏱ Te respondemos en ~2 horas</li>
+                                        <li>📷 Qué enviar: foto + largo + idea</li>
+                                        <li>📍 Fecha y comuna</li>
+                                    </ul>
                                 </div>
                             </div>
 
@@ -266,9 +447,14 @@ export default function LandingClient() {
                                 </div>
                                 <div>
                                     <h4 className="font-bold text-lg">2. Reserva</h4>
-                                    <p className="text-[#89616f] text-sm max-w-[200px]">
-                                        Agendamos tu cita para el fin de semana que prefieras.
+                                    <p className="text-[#89616f] text-sm max-w-[220px]">
+                                        Te proponemos horario y dejamos tu cupo confirmado.
                                     </p>
+
+                                    <ul className="mt-3 text-xs text-[#89616f] space-y-1">
+                                        <li>💳 Abono para reservar</li>
+                                        <li>✅ Confirmación por WhatsApp</li>
+                                    </ul>
                                 </div>
                             </div>
 
@@ -308,6 +494,20 @@ export default function LandingClient() {
                                 <span>Cobertura Exclusiva</span>
                             </div>
                             <h2 className="text-3xl lg:text-4xl font-bold">Servicio en San Bernardo</h2>
+                            <div className="rounded-2xl border border-primary/10 bg-background-light p-5">
+                                <p className="font-bold text-[#181113] mb-3">Cubrimos:</p>
+                                <ul className="grid grid-cols-2 gap-2 text-sm text-[#89616f]">
+                                    <li>• San Bernardo Centro</li>
+                                    <li>• Nos</li>
+                                    <li>• Lo Herrera</li>
+                                    <li>• La Vara</li>
+                                    <li>• El Mariscal</li>
+                                    <li>• Sector Hospital</li>
+                                </ul>
+                                <p className="mt-3 text-xs text-[#89616f]">
+                                    Si estás cerca y no apareces aquí, pregunta igual por WhatsApp.
+                                </p>
+                            </div>
                             <p className="text-[#89616f] text-lg leading-relaxed">
                                 Entendemos que tu tiempo es valioso. Por eso, llevamos el salón de belleza a la
                                 comodidad de tu hogar. Cubrimos todos los sectores de San Bernardo sin costo de
@@ -506,18 +706,24 @@ export default function LandingClient() {
                                 </div>
 
                                 <div className="masonry">
-                                    {visible.map((item) => (
-                                        <div key={item.publicId || item.src} className="masonry-item">
+                                    {visible.map((item, idx) => (
+                                        <button
+                                            key={item.publicId || item.src}
+                                            type="button"
+                                            className="masonry-item text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-xl"
+                                            onClick={() => openAt(idx)}
+                                            aria-label="Abrir foto"
+                                        >
                                             <Image
                                                 src={item.src}
                                                 alt={item.alt || "Trabajo de trenzas"}
                                                 width={item.width || 1200}
                                                 height={item.height || 1600}
                                                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                                                className="w-full h-auto rounded-xl"
+                                                className="w-full h-auto rounded-xl hover:opacity-95 transition-opacity"
                                                 loading="lazy"
                                             />
-                                        </div>
+                                        </button>
                                     ))}
                                 </div>
 
@@ -543,6 +749,22 @@ export default function LandingClient() {
                                 )}
                             </div>
                         )}
+                    </div>
+                </section>
+                <section className="px-6 lg:px-40 py-20 bg-white">
+                    <div className="max-w-[900px] mx-auto">
+                        <div className="text-center mb-10">
+                            <h2 className="text-3xl font-bold mb-3">Preguntas frecuentes</h2>
+                        </div>
+
+                        <FAQAccordion
+                            items={[
+                                { q: "¿Cuánto dura el servicio?", a: "Depende del diseño y el largo. En general entre 1 y 4 horas. Te confirmamos al cotizar." },
+                                { q: "¿Se pide abono para reservar?", a: "Sí. El abono asegura tu cupo y se descuenta del total el día del servicio." },
+                                { q: "¿Qué debo enviar por WhatsApp?", a: "Ideal: foto de tu pelo, largo (o foto), referencia del estilo, fecha y comuna." },
+                                { q: "¿Qué sectores cubres?", a: "San Bernardo (centro) y sectores cercanos. Si estás cerca, pregunta igual por WhatsApp." },
+                            ]}
+                        />
                     </div>
                 </section>
 
@@ -608,17 +830,18 @@ export default function LandingClient() {
             </footer>
 
             {/* Botón flotante ahora también abre modal */}
-            <button
-                onClick={() => setOpen(true)}
+            <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="fixed bottom-6 right-6 z-50 size-14 bg-[#25D366] text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-transform"
-                type="button"
                 aria-label="WhatsApp"
+                title={selectedService ? `Cotizar ${selectedService}` : "Cotizar por WhatsApp"}
             >
                 <svg className="size-7" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884" />
                 </svg>
-            </button>
-
+            </a>
         </>
     );
 }
