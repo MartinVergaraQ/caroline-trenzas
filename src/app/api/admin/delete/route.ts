@@ -12,7 +12,7 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET!,
 });
 
-// Solo se puede borrar contenido dentro de estas carpetas
+// SOLO estas carpetas pueden borrarse
 const ALLOWED_ROOTS = ["caroline/galeria", "caroline/servicios"];
 
 function folderAllowed(folder?: string) {
@@ -20,38 +20,103 @@ function folderAllowed(folder?: string) {
     return ALLOWED_ROOTS.some((root) => f === root || f.startsWith(root + "/"));
 }
 
-async function fetchResourceFolder(publicId: string, resource_type: "image" | "video") {
-    const r = await cloudinary.api.resource(publicId, { resource_type });
-    return (r?.folder as string | undefined) || "";
+// Fallback por si Cloudinary no devuelve folder pero el public_id sí trae carpeta
+function publicIdAllowed(publicId: string) {
+    return publicId.startsWith("caroline/galeria/") || publicId.startsWith("caroline/servicios/");
 }
 
-async function isAllowedByCloudinary(publicId: string, resourceType?: "image" | "video") {
-    // Si el cliente nos dijo el tipo, probamos solo ese
+function normalizeFolder(info: { folder?: string | null; asset_folder?: string | null }) {
+    // Cloudinary a veces usa folder, otras asset_folder
+    return (info.folder || info.asset_folder || "") as string;
+}
+
+async function probeCloudinary(publicId: string, resourceType?: "image" | "video") {
+    const tried: ("image" | "video")[] = [];
+    const details: any[] = [];
+
+    async function tryType(rt: "image" | "video") {
+        tried.push(rt);
+        const r: any = await cloudinary.api.resource(publicId, { resource_type: rt });
+
+        const info = {
+            resource_type: rt,
+            public_id: r?.public_id ?? null,
+            folder: r?.folder ?? null,
+            asset_folder: r?.asset_folder ?? null,
+            normalized_folder: normalizeFolder({ folder: r?.folder, asset_folder: r?.asset_folder }),
+            type: r?.type ?? null,
+            format: r?.format ?? null,
+            created_at: r?.created_at ?? null,
+        };
+
+        details.push(info);
+        return info;
+    }
+
+    const isInfoAllowed = (info: any) => {
+        const nf = info?.normalized_folder || "";
+        return folderAllowed(nf) || publicIdAllowed(publicId);
+    };
+
+    // Si viene resourceType, probamos ese primero
     if (resourceType) {
         try {
-            const folder = await fetchResourceFolder(publicId, resourceType);
-            return folderAllowed(folder);
-        } catch {
-            return false;
+            const info = await tryType(resourceType);
+            const allowed = isInfoAllowed(info);
+            return { ok: true, allowed, tried, details, chosen: info };
+        } catch (e: any) {
+            return {
+                ok: false,
+                allowed: false,
+                tried,
+                details,
+                error: {
+                    message: e?.message || String(e),
+                    name: e?.name,
+                    http_code: e?.http_code,
+                },
+            };
         }
     }
 
-    // Si no, probamos image y luego video
+    // Si no viene tipo, probamos image
     try {
-        const folder = await fetchResourceFolder(publicId, "image");
-        if (folderAllowed(folder)) return true;
-    } catch {
-        // ignore
+        const infoImg = await tryType("image");
+        if (isInfoAllowed(infoImg)) {
+            return { ok: true, allowed: true, tried, details, chosen: infoImg };
+        }
+    } catch (e: any) {
+        details.push({
+            resource_type: "image",
+            error: { message: e?.message || String(e), name: e?.name, http_code: e?.http_code },
+        });
     }
 
+    // Luego video
     try {
-        const folder = await fetchResourceFolder(publicId, "video");
-        if (folderAllowed(folder)) return true;
-    } catch {
-        // ignore
+        const infoVid = await tryType("video");
+        if (isInfoAllowed(infoVid)) {
+            return { ok: true, allowed: true, tried, details, chosen: infoVid };
+        }
+    } catch (e: any) {
+        details.push({
+            resource_type: "video",
+            error: { message: e?.message || String(e), name: e?.name, http_code: e?.http_code },
+        });
     }
 
-    return false;
+    // Existe o no, pero no permitido
+    const allowed =
+        publicIdAllowed(publicId) ||
+        details.some((d) => folderAllowed(d?.normalized_folder));
+
+    return {
+        ok: true,
+        allowed,
+        tried,
+        details,
+        chosen: details.find((d) => d?.normalized_folder) ?? null,
+    };
 }
 
 export async function POST(req: Request) {
@@ -72,17 +137,44 @@ export async function POST(req: Request) {
                 ? "image"
                 : undefined;
 
-    // ✅ Validación REAL por carpeta en Cloudinary
-    const allowed = await isAllowedByCloudinary(publicId, resourceType);
-    if (!allowed) {
+    // 🔎 Debug: qué llega desde el cliente
+    const clientDebug = {
+        publicId,
+        resourceType: resourceType ?? null,
+        hasCookie: !!req.headers.get("cookie"),
+    };
+
+    const probe = await probeCloudinary(publicId, resourceType);
+
+    // Si no se pudo consultar Cloudinary, devolvemos 500 con debug
+    if (!probe.ok) {
         return NextResponse.json(
-            { ok: false, message: "No permitido", publicId },
+            {
+                ok: false,
+                message: "No se pudo consultar Cloudinary",
+                clientDebug,
+                probe,
+            },
+            { status: 500 }
+        );
+    }
+
+    // Si Cloudinary existe pero no está permitido, devolvemos 403 con debug
+    if (!probe.allowed) {
+        return NextResponse.json(
+            {
+                ok: false,
+                message: "No permitido",
+                clientDebug,
+                probe,
+                allowedRoots: ALLOWED_ROOTS,
+            },
             { status: 403 }
         );
     }
 
+    // ✅ Ahora sí: borrar
     try {
-        // Si viene tipo, destruimos directo
         if (resourceType) {
             const result = await cloudinary.uploader.destroy(publicId, {
                 resource_type: resourceType,
@@ -90,12 +182,12 @@ export async function POST(req: Request) {
             });
 
             return NextResponse.json(
-                { ok: true, result },
+                { ok: true, result, clientDebug, probe },
                 { headers: { "Cache-Control": "no-store, max-age=0" } }
             );
         }
 
-        // Si no viene tipo, probamos image y si no existe, probamos video
+        // sin tipo: intenta image y si no existe, intenta video
         const result = await cloudinary.uploader.destroy(publicId, {
             resource_type: "image",
             invalidate: true,
@@ -108,18 +200,23 @@ export async function POST(req: Request) {
             });
 
             return NextResponse.json(
-                { ok: true, result: result2 },
+                { ok: true, result: result2, clientDebug, probe },
                 { headers: { "Cache-Control": "no-store, max-age=0" } }
             );
         }
 
         return NextResponse.json(
-            { ok: true, result },
+            { ok: true, result, clientDebug, probe },
             { headers: { "Cache-Control": "no-store, max-age=0" } }
         );
     } catch (e: any) {
         return NextResponse.json(
-            { ok: false, message: e?.message || "Error eliminando" },
+            {
+                ok: false,
+                message: e?.message || "Error eliminando",
+                clientDebug,
+                probe,
+            },
             { status: 500 }
         );
     }
