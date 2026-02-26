@@ -69,3 +69,44 @@ input[type="password"]::-ms-reveal,
 input[type="password"]::-ms-clear {
   display: none;
 }
+
+/* -----------------------------
+   iOS/Safari input visibility fix
+   ----------------------------- */
+
+/* Evita que iOS “redimensione” texto y haga cosas raras */
+input,
+textarea,
+select {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Fuerza color visible cuando Safari aplica autofill (a veces deja el texto “invisible”) */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: #181113 !important;
+  caret-color: #181113 !important;
+  /* evita el flash amarillo de autofill */
+  transition: background-color 9999s ease-out 0s;
+}
+
+/* iOS Safari: a veces el password queda con fill raro y no muestra puntos */
+input[type="password"],
+input[type="text"] {
+  color: #181113;
+  caret-color: #181113;
+}
+
+/* Placeholder visible (iOS a veces lo “lava”) */
+input::placeholder {
+  color: #89616f;
+  opacity: 1;
+}
+
+/* Si el navegador mete un background raro en autofill */
+input:-webkit-autofill {
+  box-shadow: 0 0 0px 1000px #fff inset !important;
+}

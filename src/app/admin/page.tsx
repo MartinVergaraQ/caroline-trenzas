@@ -1341,7 +1341,7 @@ export default function AdminPage() {
                                 disabled={loadingPasskey}
                                 className="w-full rounded-xl bg-[#181113] text-white font-bold py-3 hover:opacity-90 disabled:opacity-60"
                             >
-                                {loadingPasskey ? "Abriendo Face ID / Huella..." : "Entrar con Face ID / Huella"}
+                                {loadingPasskey ? "Abriendo Face ID..." : "Entrar con Face ID"}
                             </button>
                         ) : (
                             <div className="rounded-xl border border-primary/15 bg-primary/5 p-4">
@@ -1369,8 +1369,8 @@ export default function AdminPage() {
                                     onChange={(e) => setPwd(e.target.value)}
                                     placeholder="Escribe la clave"
                                     autoComplete="current-password"
-                                    className="w-full h-12 appearance-none rounded-full border border-[#f4f0f2] bg-white px-5 pr-14 text-[16px] leading-5
-      focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary"
+                                    inputMode="text"
+                                    className="w-full h-12 rounded-full border border-[#f4f0f2] bg-white px-5 pr-14 text-[16px] leading-5 text-[#181113] caret-[#181113] placeholder:text-[#89616f] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary"
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter") login();
                                     }}
@@ -1403,7 +1403,7 @@ export default function AdminPage() {
     }
 
     return (
-        <main className="min-h-screen p-6 lg:p-12 bg-[#fdfafb]">
+        <main className="min-h-screen p-4 sm:p-6 lg:p-12 bg-[#fdfafb]">
             <ToastStack />
             <BeforeAfterModal />
             <ConfirmDeleteModal state={confirmDelete} />
@@ -1433,118 +1433,143 @@ export default function AdminPage() {
                         </button>
                     </div>
                 ) : null}
-                <div className="flex items-center justify-between gap-4">
-                    <div>
+                {/* HEADER RESPONSIVE */}
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
                         <h1 className="text-2xl font-black mb-1">Subir fotos</h1>
                         <p className="text-sm text-[#89616f]">
                             Sube, revisa y elimina si te equivocaste. Sin tener que mendigar en Cloudinary.
                         </p>
                     </div>
 
-                    <div className="flex gap-2">
-                        {canPasskey ? (
-                            hasPasskey ? (
+                    {/* Acciones (responsive) */}
+                    <div className="w-full sm:w-auto">
+                        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+                            {canPasskey ? (
+                                hasPasskey ? (
+                                    <button
+                                        type="button"
+                                        disabled
+                                        className="col-span-2 sm:col-span-1 rounded-full border px-4 py-2 text-sm font-bold opacity-60 cursor-not-allowed"
+                                        title="Ya hay una passkey registrada"
+                                    >
+                                        ✅ Face ID
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={passkeyRegister}
+                                        disabled={loadingPasskey}
+                                        className="col-span-2 sm:col-span-1 rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
+                                    >
+                                        {loadingPasskey ? "Registrando..." : "Registrar Face ID / Huella"}
+                                    </button>
+                                )
+                            ) : null}
+
+                            <button
+                                onClick={refreshLatest}
+                                disabled={loadingLatest || isUploading}
+                                className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
+                            >
+                                {loadingLatest ? "Actualizando..." : "Actualizar"}
+                            </button>
+
+                            <button
+                                onClick={logout}
+                                disabled={isUploading}
+                                className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
+                            >
+                                Salir
+                            </button>
+
+                            {isUploading ? (
                                 <button
                                     type="button"
-                                    disabled
-                                    className="rounded-full border px-4 py-2 text-sm font-bold opacity-60 cursor-not-allowed"
-                                    title="Ya hay una passkey registrada"
+                                    disabled={!canReset}
+                                    onClick={() => {
+                                        stopUpload();
+                                        pushToast("info", "Estado reiniciado", "Se desbloquearon los botones.");
+                                    }}
+                                    className="col-span-2 sm:col-span-1 rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-50"
+                                    title={!canReset ? "Espera 20s por si la subida está en curso" : "Úsalo si quedó pegado"}
                                 >
-                                    ✅ Face ID / Huella activa
+                                    Reset
                                 </button>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={passkeyRegister}
-                                    disabled={loadingPasskey}
-                                    className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
-                                >
-                                    {loadingPasskey ? "Registrando..." : "Registrar Face ID / Huella"}
-                                </button>
-                            )
-                        ) : null}
-                        <button
-                            onClick={refreshLatest}
-                            disabled={loadingLatest || isUploading}
-                            className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
-                        >
-                            {loadingLatest ? "Actualizando..." : "Actualizar"}
-                        </button>
-                        <button
-                            onClick={logout}
-                            disabled={isUploading}
-                            className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
-                        >
-                            Salir
-                        </button>
-                        {isUploading ? (
+                            ) : null}
+                        </div>
+                    </div>
+                </div>
+
+                {/* RESÚMENES (responsive) */}
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Antes y Después */}
+                    <div className="rounded-2xl border bg-white p-4">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="font-black text-[#181113]">Antes y Después</p>
+                                <p className="text-sm text-[#89616f] mt-1">
+                                    <span className="font-bold">{ba.length}</span> servicio(s) configurado(s)
+                                </p>
+                            </div>
+                            <span className="text-xs font-bold px-2 py-1 rounded-full bg-primary/10 text-primary shrink-0">
+                                Admin
+                            </span>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-2">
                             <button
                                 type="button"
-                                disabled={!canReset}
-                                onClick={() => {
-                                    stopUpload();
-                                    pushToast("info", "Estado reiniciado", "Se desbloquearon los botones.");
-                                }}
-                                className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-50"
-                                title={!canReset ? "Espera 20s por si la subida está en curso" : "Úsalo si quedó pegado"}
+                                onClick={loadBeforeAfter}
+                                disabled={loadingBA}
+                                className="rounded-xl border px-3 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
                             >
-                                Reset
+                                {loadingBA ? "..." : "Actualizar"}
                             </button>
-                        ) : null}
-                    </div>
-                </div>
-                <div className="mt-6 rounded-2xl border bg-white p-4 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                        <p className="font-black text-[#181113]">Antes y Después</p>
-                        <p className="text-sm text-[#89616f]">
-                            {ba.length} servicio(s) configurado(s)
-                        </p>
+
+                            <button
+                                type="button"
+                                onClick={() => setOpenBA(true)}
+                                className="rounded-xl bg-primary text-white px-3 py-2 text-sm font-bold hover:bg-primary/90"
+                            >
+                                Editar
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="flex gap-2 shrink-0">
-                        <button
-                            type="button"
-                            onClick={loadBeforeAfter}
-                            disabled={loadingBA}
-                            className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
-                        >
-                            {loadingBA ? "Actualizando..." : "Actualizar"}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setOpenBA(true)}
-                            className="rounded-full bg-primary text-white px-4 py-2 text-sm font-bold hover:bg-primary/90"
-                        >
-                            Editar
-                        </button>
-                    </div>
-                </div>
-                {/* TESTIMONIOS - RESUMEN ARRIBA */}
-                <div className="mt-6 rounded-2xl border bg-white p-4 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                        <p className="font-black text-[#181113]">Testimonios</p>
-                        <p className="text-sm text-[#89616f]">
-                            Pendientes: <span className="font-bold">{pending.length}</span> · Publicados:{" "}
-                            <span className="font-bold">{approved.length}</span>/3
-                        </p>
-                    </div>
+                    {/* Testimonios */}
+                    <div className="rounded-2xl border bg-white p-4">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="font-black text-[#181113]">Testimonios</p>
+                                <p className="text-sm text-[#89616f] mt-1">
+                                    Pendientes: <span className="font-bold">{pending.length}</span> · Publicados:{" "}
+                                    <span className="font-bold">{approved.length}</span>/3
+                                </p>
+                            </div>
+                            <span className="text-xs font-bold px-2 py-1 rounded-full bg-primary/10 text-primary shrink-0">
+                                Admin
+                            </span>
+                        </div>
 
-                    <div className="flex gap-2 shrink-0">
-                        <button
-                            type="button"
-                            onClick={loadTestimonialsAdmin}
-                            disabled={loadingT}
-                            className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
-                        >
-                            {loadingT ? "Actualizando..." : "Actualizar"}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setOpenT(true)}
-                            className="rounded-full bg-primary text-white px-4 py-2 text-sm font-bold hover:bg-primary/90"
-                        >
-                            Revisar
-                        </button>
+                        <div className="mt-4 grid grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                onClick={loadTestimonialsAdmin}
+                                disabled={loadingT}
+                                className="rounded-xl border px-3 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
+                            >
+                                {loadingT ? "..." : "Actualizar"}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setOpenT(true)}
+                                className="rounded-xl bg-primary text-white px-3 py-2 text-sm font-bold hover:bg-primary/90"
+                            >
+                                Revisar
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div className="mt-6 rounded-2xl border bg-[#fdfafb] p-4">
