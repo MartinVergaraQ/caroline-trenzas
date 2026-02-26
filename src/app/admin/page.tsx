@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 
 declare global {
@@ -53,6 +53,23 @@ type Toast = {
 
 type UploadingKind = null | "gallery" | "services" | "reel" | "video";
 
+type PendingTestimonial = {
+    id: string;
+    name: string;
+    comuna: string;
+    stars: number;
+    text: string;
+    createdAt: string;
+};
+
+type BAEntry = {
+    serviceId: string;
+    title: string;
+    before?: { publicId: string; src: string };
+    after?: { publicId: string; src: string };
+    updatedAt?: string;
+};
+
 export default function AdminPage() {
     const [authed, setAuthed] = useState(false);
     const [pwd, setPwd] = useState("");
@@ -89,7 +106,251 @@ export default function AdminPage() {
     const [uploadStartedAt, setUploadStartedAt] = useState<number | null>(null);
     const canReset = isUploading && uploadStartedAt && Date.now() - uploadStartedAt > 20000;
     const disableServicesButton = uploading !== null && uploading !== "services";
+    const [pending, setPending] = useState<PendingTestimonial[]>([]);
+    const [approved, setApproved] = useState<PendingTestimonial[]>([]);
+    const [loadingT, setLoadingT] = useState(false);
+    const [openT, setOpenT] = useState(false);
+    const closeTestimonials = useCallback(() => setOpenT(false), []);
+    const [ba, setBa] = useState<BAEntry[]>([]);
+    const [loadingBA, setLoadingBA] = useState(false);
+    const [openBA, setOpenBA] = useState(false);
 
+    async function loadBeforeAfter() {
+        setLoadingBA(true);
+        try {
+            const r = await fetch("/api/admin/before-after", { credentials: "include", cache: "no-store" });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(d?.message || `HTTP ${r.status}`);
+            setBa(d.items || []);
+        } catch (e: any) {
+            pushToast("error", "No se pudo cargar Antes/Después", e?.message || "Mira consola.");
+        } finally {
+            setLoadingBA(false);
+        }
+    }
+
+    function TestimonialsModal({
+        open,
+        onClose,
+        pending,
+        approved,
+        loading,
+        onRefresh,
+        onApprove,
+        onReject,
+    }: {
+        open: boolean;
+        onClose: () => void;
+        pending: PendingTestimonial[];
+        approved: PendingTestimonial[];
+        loading: boolean;
+        onRefresh: () => void;
+        onApprove: (id: string) => void;
+        onReject: (id: string) => void;
+    }) {
+        // Bloquea scroll body (solo cuando modal abierto)
+        useEffect(() => {
+            if (!open) return;
+            const prev = document.body.style.overflow;
+            document.body.style.overflow = "hidden";
+            return () => {
+                document.body.style.overflow = prev;
+            };
+        }, [open]);
+
+        // Escape para cerrar
+        useEffect(() => {
+            if (!open) return;
+            const onKeyDown = (e: KeyboardEvent) => {
+                if (e.key === "Escape") onClose();
+            };
+            window.addEventListener("keydown", onKeyDown);
+            return () => window.removeEventListener("keydown", onKeyDown);
+        }, [open, onClose]);
+
+        if (!open) return null;
+
+        return (
+            <div className="fixed inset-0 z-[9999]">
+                <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+
+                <div className="absolute inset-0 flex items-start justify-center p-4 pt-10 md:items-center md:pt-4">
+                    <div
+                        className="w-full max-w-3xl rounded-2xl border bg-white shadow-lg overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Testimonios"
+                    >
+                        <div className="p-5 border-b bg-[#fdfafb] flex items-center justify-between">
+                            <div>
+                                <p className="font-black text-lg">Testimonios</p>
+                                <p className="text-sm text-[#89616f]">
+                                    Pendientes: {pending.length} · Publicados: {approved.length}/3
+                                </p>
+                            </div>
+
+                            <button
+                                className="rounded-full size-10 hover:bg-black/5 flex items-center justify-center"
+                                onClick={onClose}
+                                aria-label="Cerrar"
+                                type="button"
+                            >
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+
+                        <div className="p-5 max-h-[75vh] overflow-auto space-y-8">
+                            {/* Pendientes */}
+                            <div>
+                                <div className="flex items-center justify-between mb-3">
+                                    <p className="font-bold">Pendientes</p>
+                                    <button
+                                        type="button"
+                                        onClick={onRefresh}
+                                        disabled={loading}
+                                        className="rounded-full border px-3 py-1.5 text-xs font-bold hover:bg-black/5 disabled:opacity-60"
+                                    >
+                                        {loading ? "Actualizando..." : "Actualizar"}
+                                    </button>
+                                </div>
+
+                                {pending.length === 0 ? (
+                                    <div className="rounded-xl border bg-[#fdfafb] p-4 text-sm text-[#89616f]">
+                                        No hay testimonios pendientes.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {pending.map((t) => (
+                                            <div key={t.id} className="rounded-2xl border bg-[#fdfafb] p-4">
+                                                <p className="font-bold text-[#181113]">
+                                                    {t.name}{" "}
+                                                    <span className="text-sm text-[#89616f] font-medium">· {t.comuna}</span>
+                                                </p>
+
+                                                <p className="text-yellow-600 text-sm">
+                                                    {"★★★★★".slice(0, t.stars)}{" "}
+                                                    <span className="text-black/10">{"★★★★★".slice(0, 5 - t.stars)}</span>
+                                                </p>
+
+                                                <p className="mt-2 text-sm text-[#181113]">“{t.text}”</p>
+                                                <p className="mt-2 text-xs text-[#89616f]">
+                                                    {new Date(t.createdAt).toLocaleString()}
+                                                </p>
+
+                                                <div className="mt-3 flex gap-2">
+                                                    <button
+                                                        className="rounded-xl bg-primary text-white px-4 py-2 text-sm font-bold hover:bg-primary/90 disabled:opacity-50"
+                                                        onClick={() => onApprove(t.id)}
+                                                        disabled={approved.length >= 3}
+                                                        title={approved.length >= 3 ? "Ya hay 3 publicados. Rechaza uno primero." : ""}
+                                                        type="button"
+                                                    >
+                                                        Aprobar
+                                                    </button>
+
+                                                    <button
+                                                        className="rounded-xl border px-4 py-2 text-sm font-bold hover:bg-black/5"
+                                                        onClick={() => onReject(t.id)}
+                                                        type="button"
+                                                    >
+                                                        Rechazar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Publicados */}
+                            <div>
+                                <p className="font-bold mb-3">Publicados (máx 3)</p>
+
+                                {approved.length === 0 ? (
+                                    <div className="rounded-xl border bg-[#fdfafb] p-4 text-sm text-[#89616f]">
+                                        No hay testimonios publicados.
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        {approved.map((t) => (
+                                            <div key={t.id} className="rounded-2xl border bg-white p-4">
+                                                <p className="font-bold text-[#181113]">{t.name}</p>
+                                                <p className="text-xs text-[#89616f]">{t.comuna}</p>
+                                                <p className="text-yellow-600 text-sm mt-1">{"★★★★★".slice(0, t.stars)}</p>
+                                                <p className="text-sm text-[#181113] mt-2 line-clamp-4">“{t.text}”</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="p-4 border-t bg-white flex justify-end">
+                            <button
+                                className="rounded-xl border px-4 py-2 text-sm font-bold hover:bg-black/5"
+                                onClick={onClose}
+                                type="button"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    async function loadTestimonialsAdmin() {
+        setLoadingT(true);
+        try {
+            const r = await fetch("/api/admin/testimonials", { credentials: "include", cache: "no-store" });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(d?.message || `HTTP ${r.status}`);
+            setPending(d.pending || []);
+            setApproved(d.approved || []);
+            // NO abrir automático
+            // setOpenT((prev) => (d.pending?.length ? true : prev));
+        } catch (e: any) {
+            pushToast("error", "No se pudieron cargar testimonios", e?.message || "Mira consola.");
+        } finally {
+            setLoadingT(false);
+        }
+    }
+
+    async function approveTestimonial(id: string) {
+        try {
+            const r = await fetch("/api/admin/testimonials", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                cache: "no-store",
+                body: JSON.stringify({ id }),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(d?.message || `HTTP ${r.status}`);
+            pushToast("success", "Aprobado", "Ya está en la landing (máx 3).");
+            await loadTestimonialsAdmin();
+        } catch (e: any) {
+            pushToast("error", "No se pudo aprobar", e?.message || "Mira consola.");
+        }
+    }
+
+    async function rejectTestimonial(id: string) {
+        try {
+            const r = await fetch(`/api/admin/testimonials?id=${encodeURIComponent(id)}`, {
+                method: "DELETE",
+                credentials: "include",
+                cache: "no-store",
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(d?.message || `HTTP ${r.status}`);
+            pushToast("success", "Eliminado", "Se quitó de pendientes.");
+            await loadTestimonialsAdmin();
+        } catch (e: any) {
+            pushToast("error", "No se pudo eliminar", e?.message || "Mira consola.");
+        }
+    }
     function pushToast(kind: ToastKind, title: string, detail?: string) {
         const id = (globalThis.crypto?.randomUUID?.() ?? String(Date.now() + Math.random()));
         setToasts((prev) => [{ id, kind, title, detail }, ...prev].slice(0, 4));
@@ -131,6 +392,7 @@ export default function AdminPage() {
             </div>
         );
     }
+
     useEffect(() => {
         return () => {
             if (uploadTimeoutRef.current) window.clearTimeout(uploadTimeoutRef.current);
@@ -147,6 +409,8 @@ export default function AdminPage() {
                 if (data?.ok) {
                     setAuthed(true);
                     await refreshLatest();
+                    await loadTestimonialsAdmin();
+                    await loadBeforeAfter();
                 }
             })
             .catch(() => { });
@@ -288,6 +552,7 @@ export default function AdminPage() {
         setServicesLatest([]);
         setConfirmDelete(null);
         stopUpload();
+        setOpenT(false);
     }
 
     async function passkeyLogin() {
@@ -562,6 +827,199 @@ export default function AdminPage() {
 
         widget.open();
     }
+    function getBAFor(serviceId: string) {
+        return ba.find((x) => x.serviceId === serviceId);
+    }
+
+    async function saveBA(serviceId: string, title: string, slot: "before" | "after", publicId: string, src: string) {
+        const r = await fetch("/api/admin/before-after", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            cache: "no-store",
+            body: JSON.stringify({ serviceId, title, slot, publicId, src }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d?.message || `HTTP ${r.status}`);
+        setBa(d.items || []);
+    }
+
+    async function deleteBA(serviceId: string, slot: "before" | "after") {
+        try {
+            const r = await fetch(
+                `/api/admin/before-after?serviceId=${encodeURIComponent(serviceId)}&slot=${slot}`,
+                { method: "DELETE", credentials: "include", cache: "no-store" }
+            );
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(d?.message || `HTTP ${r.status}`);
+            setBa(d.items || []);
+            pushToast("success", "Eliminado", `Se quitó ${slot === "before" ? "ANTES" : "DESPUÉS"} de la web.`);
+        } catch (e: any) {
+            pushToast("error", "No se pudo eliminar", e?.message || "Mira consola.");
+        }
+    }
+
+    function openBAUploader(serviceId: string, title: string, slot: "before" | "after") {
+        if (!cloudName) return pushToast("error", "Falta cloudName");
+        if (!presetServices) return pushToast("error", "Falta preset", "Usa el mismo preset de imágenes o crea uno nuevo.");
+        if (!window.cloudinary) return pushToast("error", "No cargó widget", "Revisa el script en layout.tsx");
+
+        const options: any = {
+            cloudName,
+            uploadPreset: presetServices, // o un preset dedicado BEFORE_AFTER_PRESET
+            folder: "caroline/before-after",
+            multiple: false,
+            maxFiles: 1,
+            sources: ["local", "camera", "google_drive"],
+            clientAllowedFormats: ["png", "jpg", "jpeg", "webp"],
+            cropping: false,
+            resourceType: "image",
+            showCompletedButton: true,
+            singleUploadAutoClose: true,
+            tags: ["beforeafter", `service_${serviceId}`, `slot_${slot}`],
+            context: { album: "beforeafter", service: serviceId, slot },
+            public_id_prefix: `${serviceId}-${slot}-`,
+        };
+
+        const widget = window.cloudinary.createUploadWidget(options, async (error: any, result: any) => {
+            if (error) {
+                console.error("BA UPLOAD ERROR", error);
+                pushToast("error", "Error subiendo", error?.message || "Mira consola");
+                return;
+            }
+            if (result?.event === "success") {
+                const info = result.info || {};
+                const publicId = String(info.public_id || "");
+                const src = String(info.secure_url || "");
+                try {
+                    await saveBA(serviceId, title, slot, publicId, src);
+                    pushToast("success", "Guardado", `Se guardó ${slot === "before" ? "ANTES" : "DESPUÉS"} de ${title}.`);
+                } catch (e: any) {
+                    pushToast("error", "No se pudo guardar", e?.message || "Mira consola.");
+                }
+            }
+        });
+
+        widget.open();
+    }
+    function BeforeAfterModal() {
+        if (!openBA) return null;
+
+        return (
+            <div className="fixed inset-0 z-[9999]">
+                <div className="absolute inset-0 bg-black/40" onClick={() => setOpenBA(false)} />
+                <div className="absolute inset-0 flex items-start justify-center p-4 pt-10 md:items-center md:pt-4">
+                    <div
+                        className="w-full max-w-4xl rounded-2xl border bg-white shadow-lg overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-5 border-b bg-[#fdfafb] flex items-center justify-between">
+                            <div>
+                                <p className="font-black text-lg">Antes y Después</p>
+                                <p className="text-sm text-[#89616f]">Sube 2 fotos por servicio (antes y después).</p>
+                            </div>
+                            <button
+                                type="button"
+                                className="rounded-full size-10 hover:bg-black/5 flex items-center justify-center"
+                                onClick={() => setOpenBA(false)}
+                                aria-label="Cerrar"
+                            >
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+
+                        <div className="p-5 max-h-[75vh] overflow-auto space-y-4">
+                            {SERVICES.map((s) => {
+                                const row = getBAFor(s.id);
+                                return (
+                                    <div key={s.id} className="rounded-2xl border p-4">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <p className="font-bold text-[#181113]">{s.title}</p>
+                                            <p className="text-xs text-[#89616f]">
+                                                {row?.before ? "✅ Antes" : "— Antes"} · {row?.after ? "✅ Después" : "— Después"}
+                                            </p>
+                                        </div>
+
+                                        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <div className="rounded-2xl border bg-[#fdfafb] p-3">
+                                                <p className="text-xs font-bold text-[#89616f] mb-2">ANTES</p>
+                                                {row?.before?.src ? (
+                                                    <img src={row.before.src} className="w-full aspect-[4/5] object-cover rounded-xl border" />
+                                                ) : (
+                                                    <div className="w-full aspect-[4/5] rounded-xl border bg-white flex items-center justify-center text-sm text-[#89616f]">
+                                                        Sin foto
+                                                    </div>
+                                                )}
+                                                <div className="mt-3 flex gap-2">
+                                                    <button
+                                                        type="button"
+                                                        className="flex-1 rounded-xl bg-primary text-white font-bold py-2.5"
+                                                        onClick={() => openBAUploader(s.id, s.title, "before")}
+                                                    >
+                                                        Subir ANTES
+                                                    </button>
+
+                                                    {row?.before?.src ? (
+                                                        <button
+                                                            type="button"
+                                                            className="flex-1 rounded-xl border font-bold py-2.5 hover:bg-black/5"
+                                                            onClick={() => deleteBA(s.id, "before")}
+                                                        >
+                                                            Quitar
+                                                        </button>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+
+                                            <div className="rounded-2xl border bg-[#fdfafb] p-3">
+                                                <p className="text-xs font-bold text-[#89616f] mb-2">DESPUÉS</p>
+                                                {row?.after?.src ? (
+                                                    <img src={row.after.src} className="w-full aspect-[4/5] object-cover rounded-xl border" />
+                                                ) : (
+                                                    <div className="w-full aspect-[4/5] rounded-xl border bg-white flex items-center justify-center text-sm text-[#89616f]">
+                                                        Sin foto
+                                                    </div>
+                                                )}
+                                                <div className="mt-3 flex gap-2">
+                                                    <button
+                                                        type="button"
+                                                        className="flex-1 rounded-xl bg-primary text-white font-bold py-2.5"
+                                                        onClick={() => openBAUploader(s.id, s.title, "after")}
+                                                    >
+                                                        Subir DESPUÉS
+                                                    </button>
+
+                                                    {row?.after?.src ? (
+                                                        <button
+                                                            type="button"
+                                                            className="flex-1 rounded-xl border font-bold py-2.5 hover:bg-black/5"
+                                                            onClick={() => deleteBA(s.id, "after")}
+                                                        >
+                                                            Quitar
+                                                        </button>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <div className="p-4 border-t bg-white flex justify-end">
+                            <button
+                                type="button"
+                                className="rounded-xl border px-4 py-2 text-sm font-bold hover:bg-black/5"
+                                onClick={() => setOpenBA(false)}
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
     // ---------- uploader ----------
     function openUploader(type: "gallery" | "services") {
         if (isUploading) {
@@ -792,7 +1250,7 @@ export default function AdminPage() {
                 />
 
                 {/* dialog */}
-                <div className="absolute inset-0 flex items-center justify-center p-4">
+                <div className="absolute inset-0 flex items-start justify-center p-4 pt-10">
                     <div className="w-full max-w-md rounded-2xl border bg-white shadow-lg overflow-hidden">
                         <div className="p-5 border-b bg-[#fdfafb]">
                             <p className="font-black text-lg">Confirmar eliminación</p>
@@ -947,8 +1405,18 @@ export default function AdminPage() {
     return (
         <main className="min-h-screen p-6 lg:p-12 bg-[#fdfafb]">
             <ToastStack />
+            <BeforeAfterModal />
             <ConfirmDeleteModal state={confirmDelete} />
-
+            <TestimonialsModal
+                open={openT}
+                onClose={closeTestimonials}
+                pending={pending}
+                approved={approved}
+                loading={loadingT}
+                onRefresh={loadTestimonialsAdmin}
+                onApprove={approveTestimonial}
+                onReject={rejectTestimonial}
+            />
             <div className="max-w-5xl mx-auto bg-white border rounded-2xl p-6 shadow-sm">
                 {isUploading ? (
                     <div className="mb-4 rounded-2xl border bg-primary/5 p-4 flex items-center gap-3">
@@ -1025,7 +1493,60 @@ export default function AdminPage() {
                         ) : null}
                     </div>
                 </div>
+                <div className="mt-6 rounded-2xl border bg-white p-4 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                        <p className="font-black text-[#181113]">Antes y Después</p>
+                        <p className="text-sm text-[#89616f]">
+                            {ba.length} servicio(s) configurado(s)
+                        </p>
+                    </div>
 
+                    <div className="flex gap-2 shrink-0">
+                        <button
+                            type="button"
+                            onClick={loadBeforeAfter}
+                            disabled={loadingBA}
+                            className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
+                        >
+                            {loadingBA ? "Actualizando..." : "Actualizar"}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setOpenBA(true)}
+                            className="rounded-full bg-primary text-white px-4 py-2 text-sm font-bold hover:bg-primary/90"
+                        >
+                            Editar
+                        </button>
+                    </div>
+                </div>
+                {/* TESTIMONIOS - RESUMEN ARRIBA */}
+                <div className="mt-6 rounded-2xl border bg-white p-4 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                        <p className="font-black text-[#181113]">Testimonios</p>
+                        <p className="text-sm text-[#89616f]">
+                            Pendientes: <span className="font-bold">{pending.length}</span> · Publicados:{" "}
+                            <span className="font-bold">{approved.length}</span>/3
+                        </p>
+                    </div>
+
+                    <div className="flex gap-2 shrink-0">
+                        <button
+                            type="button"
+                            onClick={loadTestimonialsAdmin}
+                            disabled={loadingT}
+                            className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
+                        >
+                            {loadingT ? "Actualizando..." : "Actualizar"}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setOpenT(true)}
+                            className="rounded-full bg-primary text-white px-4 py-2 text-sm font-bold hover:bg-primary/90"
+                        >
+                            Revisar
+                        </button>
+                    </div>
+                </div>
                 <div className="mt-6 rounded-2xl border bg-[#fdfafb] p-4">
                     <p className="font-bold text-[#181113]">👇 En Servicios: primero elige el servicio, después sube fotos.</p>
                 </div>

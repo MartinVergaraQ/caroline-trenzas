@@ -12,13 +12,26 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET!,
 });
 
+function escCloudinaryValue(s: string) {
+    // Cloudinary search query escaping básico para evitar romper expression
+    return s.replace(/["\\]/g, "\\$&");
+}
+
 export async function GET(req: Request) {
     const guard = await requireAdmin(req);
     if (!guard.ok) return guard.res;
 
     const { searchParams } = new URL(req.url);
+
     const type = (searchParams.get("type") || "").toLowerCase();
-    const limit = Math.min(Number(searchParams.get("limit") || "30"), 60);
+    const limit = Math.min(Math.max(Number(searchParams.get("limit") || "24"), 1), 100);
+    const cursor = searchParams.get("cursor") || undefined;
+
+    // filtros
+    const media = (searchParams.get("media") || "all").toLowerCase(); // all|image|video
+    const reelOnly = searchParams.get("reel") === "1";
+    const tag = (searchParams.get("tag") || "").trim(); // cualquier tag
+    const q = (searchParams.get("q") || "").trim();     // búsqueda por public_id
 
     const folder =
         type === "gallery"
@@ -31,17 +44,43 @@ export async function GET(req: Request) {
         return NextResponse.json({ ok: false, message: "type inválido" }, { status: 400 });
     }
 
-    const expression =
+    // resource type base
+    let resourceExpr =
         type === "gallery"
-            ? `(resource_type:image OR resource_type:video) AND folder:${folder}`
-            : `resource_type:image AND folder:${folder}`;
+            ? "(resource_type:image OR resource_type:video)"
+            : "resource_type:image";
 
-    const res = await cloudinary.search
+    // media filter
+    if (media === "image") resourceExpr = "resource_type:image";
+    if (media === "video") resourceExpr = "resource_type:video";
+
+    // base expression
+    const parts: string[] = [];
+    parts.push(resourceExpr);
+    parts.push(`folder:${folder}`);
+
+    // tags
+    if (tag) parts.push(`tags:${escCloudinaryValue(tag)}`);
+    if (reelOnly) parts.push("tags:reel");
+
+    // search by public_id (contains)
+    if (q) {
+        // public_id:*texto*
+        parts.push(`public_id:*${escCloudinaryValue(q)}*`);
+    }
+
+    const expression = parts.join(" AND ");
+
+    let search = cloudinary.search
         .expression(expression)
         .with_field("tags")
         .sort_by("created_at", "desc")
-        .max_results(limit)
-        .execute();
+        .max_results(limit);
+
+    // pagination
+    if (cursor) search = search.next_cursor(cursor);
+
+    const res = await search.execute();
 
     const images = (res.resources || []).map((r: any) => ({
         publicId: r.public_id,
@@ -55,7 +94,7 @@ export async function GET(req: Request) {
     }));
 
     return NextResponse.json(
-        { ok: true, images },
+        { ok: true, images, nextCursor: res.next_cursor || null, expression },
         { headers: { "Cache-Control": "no-store, max-age=0" } }
     );
 }

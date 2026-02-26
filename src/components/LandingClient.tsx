@@ -15,6 +15,15 @@ type GalleryItem = {
     height?: number;
     tags?: string[];
 };
+
+type Testimonial = { id: string; name: string; comuna: string; stars: number; text: string; createdAt: string };
+type BAEntry = {
+    serviceId: string;
+    title: string;
+    before?: { publicId: string; src: string };
+    after?: { publicId: string; src: string };
+};
+
 const WA_PHONE = "+56974011961";
 
 const buildWhatsAppText = (service?: string) => {
@@ -33,6 +42,176 @@ const buildWhatsAppText = (service?: string) => {
 
 const waLink = (phone: string, text: string) =>
     `https://wa.me/${phone.replace(/[^\d]/g, "")}?text=${encodeURIComponent(text)}`;
+
+function ReviewForm({ onSent }: { onSent: () => void }) {
+    const [name, setName] = useState("");
+    const [comuna, setComuna] = useState("San Bernardo");
+    const [stars, setStars] = useState(5);
+    const [text, setText] = useState("");
+    const [sending, setSending] = useState(false);
+    const [done, setDone] = useState(false);
+
+    // honeypot invisible
+    const [website, setWebsite] = useState("");
+
+    const canSend = name.trim().length >= 2 && text.trim().length >= 6 && !sending;
+
+    async function submit() {
+        if (!canSend) return;
+        setSending(true);
+        try {
+            const r = await fetch("/api/testimonials", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, comuna, stars, text, website }),
+            });
+
+            if (r.ok) {
+                setDone(true);
+                onSent();
+            }
+        } finally {
+            setSending(false);
+        }
+    }
+
+    if (done) {
+        return (
+            <div className="rounded-2xl border border-primary/10 bg-white p-8 text-center shadow-sm">
+                <div className="mx-auto mb-3 size-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-primary">favorite</span>
+                </div>
+                <p className="text-lg font-black text-[#181113]">¡Gracias!</p>
+                <p className="text-sm text-[#89616f] mt-1">
+                    Tu testimonio quedó enviado 💛 <span className="font-semibold">Lo revisamos</span> antes de publicarlo.
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="rounded-2xl border border-primary/10 bg-white p-6 md:p-8 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h3 className="text-2xl font-black text-[#181113]">Deja tu testimonio</h3>
+                    <p className="text-sm text-[#89616f] mt-1">
+                        Nos ayuda muchísimo. En la página mostramos <span className="font-bold">máximo 3</span>.
+                    </p>
+                </div>
+
+                <span className="hidden md:inline-flex text-[11px] font-bold px-3 py-1 rounded-full bg-primary/10 text-primary shrink-0">
+                    1 minuto
+                </span>
+            </div>
+
+            {/* Campos */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-xs font-bold text-[#89616f] mb-2">Tu nombre</label>
+                    <input
+                        className="w-full rounded-2xl border border-[#f4f0f2] bg-[#fdfafb] px-4 py-3 text-sm
+                       focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary"
+                        placeholder="Ej: Martina"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        autoComplete="name"
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-xs font-bold text-[#89616f] mb-2">Comuna</label>
+                    <input
+                        className="w-full rounded-2xl border border-[#f4f0f2] bg-[#fdfafb] px-4 py-3 text-sm
+                       focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary"
+                        placeholder="Ej: San Bernardo"
+                        value={comuna}
+                        onChange={(e) => setComuna(e.target.value)}
+                        autoComplete="address-level2"
+                    />
+                </div>
+            </div>
+
+            {/* Estrellas */}
+            <div className="mt-5">
+                <label className="block text-xs font-bold text-[#89616f] mb-2">Calificación</label>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                    {Array.from({ length: 5 }).map((_, i) => {
+                        const n = i + 1;
+                        const active = n <= stars;
+
+                        return (
+                            <button
+                                key={n}
+                                type="button"
+                                onClick={() => setStars(n)}
+                                className={[
+                                    "h-11 px-4 rounded-full border text-sm font-bold transition",
+                                    active
+                                        ? "bg-primary text-white border-primary shadow-sm"
+                                        : "bg-white border-primary/15 text-[#181113] hover:bg-black/5",
+                                ].join(" ")}
+                                aria-label={`${n} estrellas`}
+                            >
+                                <span className={active ? "" : "text-black/30"}>★</span>{" "}
+                                <span className="ml-1">{n}</span>
+                            </button>
+                        );
+                    })}
+
+                    <span className="text-xs text-[#89616f] ml-1">
+                        {stars >= 4 ? "🔥" : stars === 3 ? "🙂" : "🫠"} {stars} / 5
+                    </span>
+                </div>
+            </div>
+
+            {/* Comentario */}
+            <div className="mt-5">
+                <label className="block text-xs font-bold text-[#89616f] mb-2">¿Cómo fue tu experiencia?</label>
+                <textarea
+                    className="w-full rounded-2xl border border-[#f4f0f2] bg-[#fdfafb] px-4 py-3 text-sm
+                     focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary"
+                    rows={4}
+                    placeholder="Cuéntanos en 1–2 frases cómo te fue 😊"
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                />
+                <div className="mt-2 flex items-center justify-between">
+                    <p className="text-xs text-[#89616f]">
+                        Por seguridad, los testimonios se revisan antes de publicarse.
+                    </p>
+                    <p className="text-xs text-[#89616f]">{Math.min(text.length, 240)} / 240</p>
+                </div>
+            </div>
+
+            {/* honeypot */}
+            <input
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                className="hidden"
+                tabIndex={-1}
+                autoComplete="off"
+            />
+
+            {/* CTA */}
+            <button
+                type="button"
+                onClick={submit}
+                disabled={!canSend}
+                className="mt-6 w-full rounded-full bg-primary text-white font-black py-4 shadow-lg shadow-primary/20
+                   hover:bg-primary/90 active:scale-[0.99] transition disabled:opacity-50"
+            >
+                {sending ? "Enviando..." : "Enviar testimonio"}
+            </button>
+
+            {!canSend ? (
+                <p className="mt-3 text-xs text-[#89616f] text-center">
+                    Tip: escribe tu nombre y un comentario un poquito más largo para habilitar el envío.
+                </p>
+            ) : null}
+        </div>
+    );
+}
 
 function FAQAccordion({ items }: { items: { q: string; a: string }[] }) {
     const [open, setOpen] = useState<number | null>(0);
@@ -63,8 +242,35 @@ function FAQAccordion({ items }: { items: { q: string; a: string }[] }) {
         </div>
     );
 }
+
 export default function LandingClient() {
     const [open, setOpen] = useState(false);
+    const [beforeAfter, setBeforeAfter] = useState<BAEntry[]>([]);
+    const [loadingBA, setLoadingBA] = useState(true);
+
+    useEffect(() => {
+        let alive = true;
+        setLoadingBA(true);
+
+        fetch("/api/before-after", { cache: "no-store" })
+            .then((r) => r.json())
+            .then((d) => {
+                if (!alive) return;
+                setBeforeAfter(d.items || []);
+            })
+            .catch(() => {
+                if (!alive) return;
+                setBeforeAfter([]);
+            })
+            .finally(() => {
+                if (!alive) return;
+                setLoadingBA(false);
+            });
+
+        return () => {
+            alive = false;
+        };
+    }, []);
 
     const [gallery, setGallery] = useState<GalleryItem[]>([]);
     const [reels, setReels] = useState<GalleryItem[]>([]);
@@ -105,6 +311,14 @@ export default function LandingClient() {
         setActivePhotoIndex((i) => (i + 1) % photos.length);
         setZoom(false);
     };
+
+    const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+    const [loadingTestimonials, setLoadingTestimonials] = useState(true);
+
+    useEffect(() => {
+        refreshTestimonials();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         if (!openPhoto) return;
@@ -166,6 +380,18 @@ export default function LandingClient() {
     const visible = photos.slice(0, visiblePhotos);
     const hasMore = visiblePhotos < photos.length;
 
+    async function refreshTestimonials() {
+        setLoadingTestimonials(true);
+        try {
+            const r = await fetch("/api/testimonials");
+            const d = await r.json().catch(() => ({}));
+            setTestimonials(d.testimonials || []);
+        } catch {
+            setTestimonials([]);
+        } finally {
+            setLoadingTestimonials(false);
+        }
+    }
     return (
         <>
             {/* Modal */}
@@ -417,6 +643,106 @@ export default function LandingClient() {
                         )}
                     </div>
                 </section>
+                {/* Before / After */}
+                <section id="antes-despues" className="scroll-mt-24 px-6 lg:px-40 py-20 bg-white">
+                    <div className="max-w-[1200px] mx-auto">
+                        <div className="text-center mb-12 space-y-3">
+                            <h2 className="text-3xl lg:text-4xl font-bold text-[#181113]">Antes y Después</h2>
+                            <div className="h-1.5 w-20 bg-primary mx-auto rounded-full" />
+                            <p className="text-[#89616f]">Cambios reales. Sin promesas raras.</p>
+                        </div>
+
+                        {loadingBA ? (
+                            <div className="rounded-2xl border border-primary/10 bg-background-light p-10 text-center">
+                                <p className="text-[#89616f]">Cargando Antes y Después…</p>
+                            </div>
+                        ) : beforeAfter.length === 0 ? (
+                            <div className="rounded-2xl border border-primary/10 bg-background-light p-10 text-center">
+                                <p className="text-[#89616f]">Pronto subiremos Antes y Después reales ✨</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                {beforeAfter
+                                    .slice()
+                                    .sort((a, b) => {
+                                        const aa = (a.before?.src ? 1 : 0) + (a.after?.src ? 1 : 0);
+                                        const bb = (b.before?.src ? 1 : 0) + (b.after?.src ? 1 : 0);
+                                        return bb - aa;
+                                    })
+                                    .slice(0, 3)
+                                    .map((it) => (
+                                        <div
+                                            key={it.serviceId}
+                                            className="group bg-background-light rounded-2xl border border-transparent hover:border-primary/10 hover:shadow-xl transition-all duration-300 p-5"
+                                        >
+                                            <div className="flex items-start justify-between gap-3 mb-4">
+                                                <p className="text-lg font-bold text-[#181113] line-clamp-2">{it.title}</p>
+                                                <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-primary/10 text-primary shrink-0">
+                                                    Antes / Después
+                                                </span>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {/* ANTES */}
+                                                <div className="rounded-2xl overflow-hidden bg-white border border-primary/10">
+                                                    <div className="relative aspect-square bg-black/5">
+                                                        {it.before?.src ? (
+                                                            <Image
+                                                                src={it.before.src}
+                                                                alt={`Antes - ${it.title}`}
+                                                                fill
+                                                                sizes="(max-width: 768px) 50vw, 25vw"
+                                                                className="object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="absolute inset-0 flex items-center justify-center px-3 text-center text-xs font-semibold text-[#89616f]">
+                                                                Pronto subimos fotos reales ✨
+                                                            </div>
+                                                        )}
+
+                                                        <span className="absolute left-2 top-2 rounded-full bg-white/90 backdrop-blur px-3 py-1 text-[11px] font-extrabold text-[#181113]">
+                                                            ANTES
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* DESPUÉS */}
+                                                <div className="rounded-2xl overflow-hidden bg-white border border-primary/10">
+                                                    <div className="relative aspect-square bg-black/5">
+                                                        {it.after?.src ? (
+                                                            <Image
+                                                                src={it.after.src}
+                                                                alt={`Después - ${it.title}`}
+                                                                fill
+                                                                sizes="(max-width: 768px) 50vw, 25vw"
+                                                                className="object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="absolute inset-0 flex items-center justify-center px-3 text-center text-xs font-semibold text-[#89616f]">
+                                                                Pronto subimos fotos reales ✨
+                                                            </div>
+                                                        )}
+
+                                                        <span className="absolute left-2 top-2 rounded-full bg-white/90 backdrop-blur px-3 py-1 text-[11px] font-extrabold text-[#181113]">
+                                                            DESPUÉS
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <p className="mt-4 text-xs text-[#89616f]">
+                                                Tip: mándanos foto + referencia por WhatsApp y te cotizamos rápido.
+                                            </p>
+                                        </div>
+                                    ))}
+                            </div>
+                        )}
+
+                        <p className="text-xs text-[#89616f] mt-10 text-center">
+                            Tip: si quieres un resultado similar, mándanos una foto y una referencia por WhatsApp.
+                        </p>
+                    </div>
+                </section>
 
                 {/* Process Section */}
                 <section className="px-6 lg:px-40 py-20 bg-background-light">
@@ -603,6 +929,12 @@ export default function LandingClient() {
                                 </p>
                             </div>
                         </div>
+                    </div>
+                </section>
+                {/* Review Form (siempre visible) */}
+                <section className="px-6 lg:px-40 py-16 bg-white">
+                    <div className="max-w-[900px] mx-auto">
+                        <ReviewForm onSent={refreshTestimonials} />
                     </div>
                 </section>
 
