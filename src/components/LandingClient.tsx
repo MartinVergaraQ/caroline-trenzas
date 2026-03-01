@@ -826,19 +826,45 @@ export default function LandingClient() {
                                 <span>Cobertura Exclusiva</span>
                             </div>
                             <h2 className="text-3xl lg:text-4xl font-bold">Servicio en San Bernardo</h2>
+                            {/* Coberturas */}
                             <div className="rounded-2xl border border-primary/10 bg-background-light p-5">
-                                <p className="font-bold text-[#181113] mb-3">Cubrimos:</p>
-                                <ul className="grid grid-cols-2 gap-2 text-sm text-[#89616f]">
-                                    <li>• San Bernardo Centro</li>
-                                    <li>• Nos</li>
-                                    <li>• Lo Herrera</li>
-                                    <li>• La Vara</li>
-                                    <li>• El Mariscal</li>
-                                    <li>• Sector Hospital</li>
-                                </ul>
-                                <p className="mt-3 text-xs text-[#89616f]">
-                                    Si estás cerca y no apareces aquí, pregunta igual por WhatsApp.
-                                </p>
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary text-xl">location_on</span>
+                                        <p className="font-black text-[#181113]">Cubrimos</p>
+                                    </div>
+
+                                    <span className="shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary">
+                                        San Bernardo
+                                    </span>
+                                </div>
+
+                                <div className="mt-4 grid grid-cols-2 gap-2">
+                                    {[
+                                        "San Bernardo Centro",
+                                        "Nos",
+                                        "Lo Herrera",
+                                        "La Vara",
+                                        "El Mariscal",
+                                        "Sector Hospital",
+                                    ].map((x) => (
+                                        <div
+                                            key={x}
+                                            className="flex items-center gap-2 rounded-xl border border-primary/10 bg-white px-3 py-2"
+                                        >
+                                            <span className="inline-flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                                <span className="material-symbols-outlined text-[18px]">check</span>
+                                            </span>
+                                            <span className="text-sm font-medium text-[#181113] leading-tight">{x}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="mt-4 rounded-xl border border-primary/10 bg-white px-4 py-3">
+                                    <p className="text-xs text-[#89616f]">
+                                        Si estás cerca y no apareces aquí, pregunta igual por WhatsApp.
+                                    </p>
+                                </div>
                             </div>
                             <p className="text-[#89616f] text-lg leading-relaxed">
                                 Entendemos que tu tiempo es valioso. Por eso, llevamos el salón de belleza a la

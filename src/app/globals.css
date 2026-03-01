@@ -53,21 +53,12 @@ input[type="password"]::-ms-clear {
   display: none;
 }
 
-/* Chrome/Edge/Safari: quita iconos nativos del input password */
+/* Chrome/Edge/Safari: quita botones nativos (SIN romper iOS) */
 input[type="password"]::-webkit-credentials-auto-fill-button,
-input[type="password"]::-webkit-contacts-auto-fill-button,
-input[type="password"]::-webkit-textfield-decoration-container {
+input[type="password"]::-webkit-contacts-auto-fill-button {
   visibility: hidden;
   display: none !important;
   pointer-events: none;
-  position: absolute;
-  right: 0;
-}
-
-/* Edge/IE viejo (ya lo tienes, lo dejo completo) */
-input[type="password"]::-ms-reveal,
-input[type="password"]::-ms-clear {
-  display: none;
 }
 
 /* -----------------------------
@@ -81,7 +72,7 @@ select {
   -webkit-text-size-adjust: 100%;
 }
 
-/* Fuerza color visible cuando Safari aplica autofill (a veces deja el texto “invisible”) */
+/* Fuerza color visible cuando Safari aplica autofill */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
@@ -89,24 +80,48 @@ textarea:-webkit-autofill,
 select:-webkit-autofill {
   -webkit-text-fill-color: #181113 !important;
   caret-color: #181113 !important;
-  /* evita el flash amarillo de autofill */
   transition: background-color 9999s ease-out 0s;
 }
 
-/* iOS Safari: a veces el password queda con fill raro y no muestra puntos */
+/* Fuerza texto/caret visible */
 input[type="password"],
-input[type="text"] {
+input[type="text"],
+textarea,
+select {
   color: #181113;
   caret-color: #181113;
 }
 
-/* Placeholder visible (iOS a veces lo “lava”) */
-input::placeholder {
+/* Placeholder visible */
+input::placeholder,
+textarea::placeholder {
   color: #89616f;
   opacity: 1;
 }
 
-/* Si el navegador mete un background raro en autofill */
+/* Evita el background amarillo de autofill */
 input:-webkit-autofill {
   box-shadow: 0 0 0px 1000px #fff inset !important;
+}
+
+@keyframes cardFloat {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.animate-cardFloat {
+  animation: cardFloat 6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-cardFloat {
+    animation: none;
+  }
 }

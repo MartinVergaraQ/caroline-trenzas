@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
+import AdminShell from "@/components/admin/AdminShell";
+import BeforeAfterEditorView from "@/components/admin/BeforeAfterEditorView";
+import DashboardView from "@/components/admin/DashboardView";
+import TestimonialsModerationView from "@/components/admin/TestimonialsModerationView";
+import GalleryView from "@/components/admin/GalleryView";
+import ServicesView from "@/components/admin/ServicesView";
+import SettingsView from "@/components/admin/SettingsView";
 
 declare global {
     interface Window {
@@ -70,6 +77,10 @@ type BAEntry = {
     updatedAt?: string;
 };
 
+type AdminView = "dashboard" | "gallery" | "services" | "beforeafter" | "testimonials" | "settings";
+
+type PasskeyStatus = "idle" | "checking" | "ready" | "working" | "ok" | "fail";
+
 export default function AdminPage() {
     const [authed, setAuthed] = useState(false);
     const [pwd, setPwd] = useState("");
@@ -114,6 +125,159 @@ export default function AdminPage() {
     const [ba, setBa] = useState<BAEntry[]>([]);
     const [loadingBA, setLoadingBA] = useState(false);
     const [openBA, setOpenBA] = useState(false);
+    const [view, setView] = useState<AdminView>("dashboard");
+    const [qGallery, setQGallery] = useState("");
+    const [qServices, setQServices] = useState("");
+    const [qGlobal, setQGlobal] = useState(""); // opcional, para dashboard/otros
+    const [passkeyStatus, setPasskeyStatus] = useState<PasskeyStatus>("checking");
+    const resetPasskeyTimer = useRef<number | null>(null);
+
+    const viewMeta = useMemo(() => {
+        const user = { name: "Caroline T.", email: "caroline@trenzas.com" };
+
+        if (view === "gallery") {
+            return {
+                active: "gallery" as const,
+                title: "Galería",
+                titleIcon: "image",
+                subtitle: `${galleryImages} fotos · ${galleryVideos} videos`,
+                search: { value: qGallery, onChange: setQGallery, placeholder: "Buscar en galería..." },
+                rightActions: (
+                    <>
+                        <button
+                            type="button"
+                            onClick={refreshLatest}
+                            className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-primary/20 rounded-full text-sm font-bold text-slate-700 shadow-sm hover:shadow-md transition-all active:scale-95"
+                        >
+                            <span className="material-symbols-outlined text-[20px]">refresh</span>
+                            {loadingLatest ? "Actualizando..." : "Actualizar"}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => openUploader("gallery")}
+                            className="bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-full font-bold text-sm flex items-center gap-2 transition-all shadow-lg shadow-primary/20"
+                        >
+                            <span className="material-symbols-outlined text-[20px]">add_a_photo</span>
+                            <span className="hidden sm:inline">Subir Foto</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => openVideoUploader(true)}
+                            className="bg-white border border-primary/20 hover:border-primary text-primary px-5 py-2.5 rounded-full font-bold text-sm flex items-center gap-2 transition-all"
+                        >
+                            <span className="material-symbols-outlined text-[20px]">movie</span>
+                            <span className="hidden sm:inline">Subir Reel</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            className="ml-1 size-10 rounded-full bg-background-light border border-primary/10 flex items-center justify-center text-slate-600 relative"
+                            aria-label="Notificaciones"
+                        >
+                            <span className="material-symbols-outlined">notifications</span>
+                            <span className="absolute top-2 right-2 size-2 bg-primary rounded-full" />
+                        </button>
+                    </>
+                ),
+                user,
+            };
+        }
+
+        if (view === "services") {
+            return {
+                active: "services" as const,
+                title: "Servicios",
+                titleIcon: "brush",
+                subtitle: "Gestión de Galería",
+                search: { value: qServices, onChange: setQServices, placeholder: "Buscar fotos o estilos..." },
+                rightActions: (
+                    <>
+                        <button
+                            type="button"
+                            className="size-10 rounded-full bg-background-light border border-primary/10 flex items-center justify-center text-slate-600 relative"
+                            aria-label="Notificaciones"
+                        >
+                            <span className="material-symbols-outlined">notifications</span>
+                            <span className="absolute top-2 right-2 size-2 bg-primary rounded-full" />
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={refreshLatest}
+                            className="bg-primary text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-primary/25 hover:scale-[1.03] transition-transform"
+                        >
+                            Actualizar
+                        </button>
+                    </>
+                ),
+                user,
+            };
+        }
+
+        if (view === "settings") {
+            return {
+                active: "settings" as const,
+                title: "Ajustes",
+                titleIcon: "settings",
+                subtitle: "Configuración del acceso y sesión",
+                search: { value: qGlobal, onChange: setQGlobal, placeholder: "Buscar..." },
+                rightActions: (
+                    <>
+                        <button
+                            type="button"
+                            className="size-10 rounded-full bg-background-light border border-primary/10 flex items-center justify-center text-slate-600"
+                            aria-label="Notificaciones"
+                        >
+                            <span className="material-symbols-outlined">notifications</span>
+                        </button>
+                        <div className="size-10 rounded-full bg-primary/20 border border-primary/20" />
+                    </>
+                ),
+                user,
+            };
+        }
+
+        // default
+        return {
+            active:
+                view === "dashboard" ? ("dashboard" as const)
+                    : view === "beforeafter" ? ("beforeAfter" as const)
+                        : ("testimonials" as const),
+            title:
+                view === "dashboard" ? "Panel de Control"
+                    : view === "beforeafter" ? "Antes/Después"
+                        : "Moderación",
+            titleIcon:
+                view === "dashboard" ? "dashboard"
+                    : view === "beforeafter" ? "compare"
+                        : "chat_bubble",
+            subtitle: undefined,
+            search: { value: qGlobal, onChange: setQGlobal, placeholder: "Buscar..." },
+            rightActions: (
+                <button
+                    type="button"
+                    className="size-10 rounded-full bg-background-light border border-primary/10 flex items-center justify-center text-slate-600"
+                    aria-label="Notificaciones"
+                >
+                    <span className="material-symbols-outlined">notifications</span>
+                </button>
+            ),
+            user,
+        };
+    }, [view, qGallery, qServices, qGlobal, galleryImages, galleryVideos, loadingLatest]);
+
+    function resetPasskeyStatus(delay = 2200) {
+        if (resetPasskeyTimer.current) window.clearTimeout(resetPasskeyTimer.current);
+        resetPasskeyTimer.current = window.setTimeout(() => setPasskeyStatus("ready"), delay);
+    }
+
+    useEffect(() => {
+        return () => {
+            if (resetPasskeyTimer.current) window.clearTimeout(resetPasskeyTimer.current);
+        };
+    }, []);
 
     async function loadBeforeAfter() {
         setLoadingBA(true);
@@ -445,11 +609,16 @@ export default function AdminPage() {
     }, []);
 
     useEffect(() => {
-        const t = setTimeout(() => {
-            setCanPasskey((v) => (v === null ? false : v));
-        }, 1200);
-        return () => clearTimeout(t);
-    }, []);
+        if (canPasskey === null) {
+            setPasskeyStatus("checking");
+            return;
+        }
+        if (!canPasskey || !hasPasskey) {
+            setPasskeyStatus("fail");
+            return;
+        }
+        setPasskeyStatus("ready");
+    }, [canPasskey, hasPasskey]);
 
     function startUpload(kind: UploadingKind) {
         setUploading(kind);
@@ -557,6 +726,7 @@ export default function AdminPage() {
 
     async function passkeyLogin() {
         setLoadingPasskey(true);
+        setPasskeyStatus("working");
 
         try {
             const or = await fetch("/api/admin/webauthn/login/options", {
@@ -565,12 +735,7 @@ export default function AdminPage() {
             });
 
             const opts = await or.json().catch(() => ({}));
-            if (!or.ok) {
-                pushToast("error", "No se pudo iniciar",
-                    (opts?.message || `HTTP ${or.status}`) +
-                    (opts?.debug ? ` | debug: ${JSON.stringify(opts.debug)}` : ""));
-                return;
-            }
+            if (!or.ok) throw new Error(opts?.message || `HTTP ${or.status}`);
 
             const cred = await startAuthentication(opts);
 
@@ -583,20 +748,17 @@ export default function AdminPage() {
             });
 
             const data = await vr.json().catch(() => ({}));
+            if (!vr.ok) throw new Error(data?.message || `HTTP ${vr.status}`);
 
-            if (!vr.ok) {
-                pushToast("error", "No se pudo ingresar",
-                    (data?.message || `HTTP ${vr.status}`) +
-                    (data?.debug ? ` | debug: ${JSON.stringify(data.debug)}` : ""));
-                return;
-            }
-
+            setPasskeyStatus("ok");
             setAuthed(true);
             pushToast("success", "Listo", "Entraste con Face ID / Huella.");
             await refreshLatest();
         } catch (e: any) {
             console.error("PASSKEY LOGIN ERROR", e);
-            pushToast("error", "Error con Passkey", `${e?.name || "Error"}: ${e?.message || e}`);
+            setPasskeyStatus("fail");
+            pushToast("error", "Falló Face ID", e?.message || "Intenta otra vez.");
+            resetPasskeyStatus(); // vuelve a "ready" después de un rato
         } finally {
             setLoadingPasskey(false);
         }
@@ -902,124 +1064,7 @@ export default function AdminPage() {
 
         widget.open();
     }
-    function BeforeAfterModal() {
-        if (!openBA) return null;
 
-        return (
-            <div className="fixed inset-0 z-[9999]">
-                <div className="absolute inset-0 bg-black/40" onClick={() => setOpenBA(false)} />
-                <div className="absolute inset-0 flex items-start justify-center p-4 pt-10 md:items-center md:pt-4">
-                    <div
-                        className="w-full max-w-4xl rounded-2xl border bg-white shadow-lg overflow-hidden"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="p-5 border-b bg-[#fdfafb] flex items-center justify-between">
-                            <div>
-                                <p className="font-black text-lg">Antes y Después</p>
-                                <p className="text-sm text-[#89616f]">Sube 2 fotos por servicio (antes y después).</p>
-                            </div>
-                            <button
-                                type="button"
-                                className="rounded-full size-10 hover:bg-black/5 flex items-center justify-center"
-                                onClick={() => setOpenBA(false)}
-                                aria-label="Cerrar"
-                            >
-                                <span className="material-symbols-outlined">close</span>
-                            </button>
-                        </div>
-
-                        <div className="p-5 max-h-[75vh] overflow-auto space-y-4">
-                            {SERVICES.map((s) => {
-                                const row = getBAFor(s.id);
-                                return (
-                                    <div key={s.id} className="rounded-2xl border p-4">
-                                        <div className="flex items-center justify-between gap-3">
-                                            <p className="font-bold text-[#181113]">{s.title}</p>
-                                            <p className="text-xs text-[#89616f]">
-                                                {row?.before ? "✅ Antes" : "— Antes"} · {row?.after ? "✅ Después" : "— Después"}
-                                            </p>
-                                        </div>
-
-                                        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            <div className="rounded-2xl border bg-[#fdfafb] p-3">
-                                                <p className="text-xs font-bold text-[#89616f] mb-2">ANTES</p>
-                                                {row?.before?.src ? (
-                                                    <img src={row.before.src} className="w-full aspect-[4/5] object-cover rounded-xl border" />
-                                                ) : (
-                                                    <div className="w-full aspect-[4/5] rounded-xl border bg-white flex items-center justify-center text-sm text-[#89616f]">
-                                                        Sin foto
-                                                    </div>
-                                                )}
-                                                <div className="mt-3 flex gap-2">
-                                                    <button
-                                                        type="button"
-                                                        className="flex-1 rounded-xl bg-primary text-white font-bold py-2.5"
-                                                        onClick={() => openBAUploader(s.id, s.title, "before")}
-                                                    >
-                                                        Subir ANTES
-                                                    </button>
-
-                                                    {row?.before?.src ? (
-                                                        <button
-                                                            type="button"
-                                                            className="flex-1 rounded-xl border font-bold py-2.5 hover:bg-black/5"
-                                                            onClick={() => deleteBA(s.id, "before")}
-                                                        >
-                                                            Quitar
-                                                        </button>
-                                                    ) : null}
-                                                </div>
-                                            </div>
-
-                                            <div className="rounded-2xl border bg-[#fdfafb] p-3">
-                                                <p className="text-xs font-bold text-[#89616f] mb-2">DESPUÉS</p>
-                                                {row?.after?.src ? (
-                                                    <img src={row.after.src} className="w-full aspect-[4/5] object-cover rounded-xl border" />
-                                                ) : (
-                                                    <div className="w-full aspect-[4/5] rounded-xl border bg-white flex items-center justify-center text-sm text-[#89616f]">
-                                                        Sin foto
-                                                    </div>
-                                                )}
-                                                <div className="mt-3 flex gap-2">
-                                                    <button
-                                                        type="button"
-                                                        className="flex-1 rounded-xl bg-primary text-white font-bold py-2.5"
-                                                        onClick={() => openBAUploader(s.id, s.title, "after")}
-                                                    >
-                                                        Subir DESPUÉS
-                                                    </button>
-
-                                                    {row?.after?.src ? (
-                                                        <button
-                                                            type="button"
-                                                            className="flex-1 rounded-xl border font-bold py-2.5 hover:bg-black/5"
-                                                            onClick={() => deleteBA(s.id, "after")}
-                                                        >
-                                                            Quitar
-                                                        </button>
-                                                    ) : null}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        <div className="p-4 border-t bg-white flex justify-end">
-                            <button
-                                type="button"
-                                className="rounded-xl border px-4 py-2 text-sm font-bold hover:bg-black/5"
-                                onClick={() => setOpenBA(false)}
-                            >
-                                Cerrar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
     // ---------- uploader ----------
     function openUploader(type: "gallery" | "services") {
         if (isUploading) {
@@ -1312,90 +1357,211 @@ export default function AdminPage() {
 
     // ---------- UI ----------
     if (!authed) {
-        return (
-            <main className="min-h-screen flex items-center justify-center p-6 bg-[#fdfafb]">
-                <ToastStack />
-                <div className="w-full max-w-md rounded-2xl border bg-white shadow-sm overflow-hidden">
-                    {/* Header */}
-                    <div className="p-6 border-b bg-white">
-                        <h1 className="text-xl font-black text-[#181113]">Admin Caroline Trenzas</h1>
-                        <p className="text-sm text-[#89616f] mt-1">
-                            Acceso privado para subir fotos y reels.
-                        </p>
-                    </div>
+        const faceIdLabel = (() => {
+            if (passkeyStatus === "checking") return "Comprobando Face ID…";
+            if (passkeyStatus === "working") return "Abriendo Face ID…";
+            if (passkeyStatus === "ok") return "✅ Listo";
+            if (passkeyStatus === "fail") return hasPasskey ? "Falló. Intenta otra vez" : "Face ID no activado";
+            return "Entrar con Face ID";
+        })();
 
-                    {/* Body */}
-                    <div className="p-6 space-y-4">
-                        {/* Passkey CTA */}
-                        {canPasskey === null ? (
-                            <div className="w-full rounded-xl border border-[#f4f0f2] bg-[#fdfafb] py-3 text-center text-sm text-[#89616f]">
-                                Comprobando Face ID / Huella…
+        const faceIdIcon = (() => {
+            if (passkeyStatus === "ok") return "check_circle";
+            if (passkeyStatus === "fail") return hasPasskey ? "error" : "lock";
+            if (passkeyStatus === "working") return "fingerprint";
+            return "face";
+        })();
+
+        const faceIdBoxCls = (() => {
+            if (!hasPasskey || !canPasskey) return "border-primary/15 bg-primary/5";
+            if (passkeyStatus === "fail") return "border-red-300 bg-red-50";
+            if (passkeyStatus === "ok") return "border-green-300 bg-green-50";
+            return "border-primary/20 hover:border-primary/50 hover:bg-primary/5";
+        })();
+
+        return (
+            <main className="min-h-screen bg-white font-display text-slate-900">
+                <ToastStack />
+
+                <div className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-x-hidden p-4">
+                    {/* Decoration */}
+                    <div className="pointer-events-none absolute top-0 left-0 w-72 h-72 bg-primary/10 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl" />
+                    <div className="pointer-events-none absolute bottom-0 right-0 w-[520px] h-[520px] bg-primary/15 rounded-full translate-x-1/3 translate-y-1/3 blur-3xl" />
+
+                    <div className="w-full max-w-[440px] z-10">
+                        {/* Brand */}
+                        <div className="flex flex-col items-center mb-8 gap-4">
+                            <div className="size-16 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary/20">
+                                <span className="material-symbols-outlined !text-4xl">auto_awesome</span>
                             </div>
-                        ) : !canPasskey ? (
-                            <div className="w-full rounded-xl border border-[#f4f0f2] bg-[#fdfafb] py-3 px-4 text-sm text-[#89616f]">
-                                Face ID / Huella no disponible en este navegador.
+                            <div className="text-center">
+                                <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
+                                    Caroline Trenzas
+                                </h1>
+                                <p className="text-slate-500 mt-1 font-medium">Panel de Administración</p>
                             </div>
-                        ) : hasPasskey ? (
-                            <button
-                                onClick={passkeyLogin}
-                                disabled={loadingPasskey}
-                                className="w-full rounded-xl bg-[#181113] text-white font-bold py-3 hover:opacity-90 disabled:opacity-60"
-                            >
-                                {loadingPasskey ? "Abriendo Face ID..." : "Entrar con Face ID"}
-                            </button>
-                        ) : (
-                            <div className="rounded-xl border border-primary/15 bg-primary/5 p-4">
-                                <p className="text-sm font-bold text-[#181113]">Activa Face ID / Huella</p>
-                                <p className="text-sm text-[#89616f] mt-1">
-                                    Este dispositivo aún no está registrado. Regístralo una vez y después podrás entrar con un toque.
-                                </p>
-                            </div>
-                        )}
-                        {/* Divider */}
-                        <div className="flex items-center gap-3 py-2">
-                            <div className="h-px flex-1 bg-[#f4f0f2]" />
-                            <span className="text-xs text-[#89616f]">o con clave</span>
-                            <div className="h-px flex-1 bg-[#f4f0f2]" />
                         </div>
 
-                        {/* Password */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-semibold text-[#181113]">Clave</label>
+                        {/* Card (animación sutil) */}
+                        <div
+                            className={[
+                                "bg-white/90 backdrop-blur-md rounded-2xl shadow-xl shadow-primary/10 border border-primary/10 p-8",
+                                "transition-transform duration-300 will-change-transform",
+                                "hover:-translate-y-[2px] hover:shadow-2xl hover:shadow-primary/15",
+                                "animate-cardFloat",
+                            ].join(" ")}
+                        >
+                            {/* Passkey / Face ID */}
+                            <div className="mb-10">
+                                {canPasskey === null ? (
+                                    <div className="w-full p-6 rounded-2xl border border-slate-200 bg-slate-50 text-center">
+                                        <p className="text-sm font-semibold text-slate-600">
+                                            Comprobando Face ID / Huella…
+                                        </p>
+                                    </div>
+                                ) : !canPasskey ? (
+                                    <div className="w-full p-6 rounded-2xl border border-slate-200 bg-slate-50 text-center">
+                                        <p className="text-sm font-semibold text-slate-600">
+                                            Face ID / Huella no disponible en este navegador.
+                                        </p>
+                                    </div>
+                                ) : hasPasskey ? (
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            // si venía fallado, lo dejamos volver a “ready”
+                                            if (passkeyStatus === "fail") setPasskeyStatus("ready");
+                                            try {
+                                                await passkeyLogin();
+                                            } catch {
+                                                // el toast ya lo manejas en passkeyLogin
+                                            }
+                                        }}
+                                        disabled={loadingPasskey || passkeyStatus === "checking"}
+                                        className={[
+                                            "w-full group flex flex-col items-center justify-center p-6 rounded-2xl border-2 border-dashed",
+                                            "transition-all duration-300 disabled:opacity-60",
+                                            faceIdBoxCls,
+                                        ].join(" ")}
+                                    >
+                                        <span
+                                            className={[
+                                                "material-symbols-outlined !text-5xl mb-3",
+                                                passkeyStatus === "fail"
+                                                    ? "text-red-500"
+                                                    : passkeyStatus === "ok"
+                                                        ? "text-green-600"
+                                                        : "text-primary",
+                                                loadingPasskey ? "animate-pulse" : "",
+                                            ].join(" ")}
+                                        >
+                                            {faceIdIcon}
+                                        </span>
 
-                            <div className="relative">
-                                <input
-                                    type={showPwd ? "text" : "password"}
-                                    value={pwd}
-                                    onChange={(e) => setPwd(e.target.value)}
-                                    placeholder="Escribe la clave"
-                                    autoComplete="current-password"
-                                    inputMode="text"
-                                    className="w-full h-12 rounded-full border border-[#f4f0f2] bg-white px-5 pr-14 text-[16px] leading-5 text-[#181113] caret-[#181113] placeholder:text-[#89616f] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary"
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter") login();
-                                    }}
-                                />
+                                        <span className="text-sm font-semibold text-slate-800">
+                                            {faceIdLabel}
+                                        </span>
+
+                                        {passkeyStatus === "fail" ? (
+                                            <span className="mt-1 text-xs text-slate-500">
+                                                Si sigue fallando, entra con clave.
+                                            </span>
+                                        ) : null}
+                                    </button>
+                                ) : (
+                                    <div className="w-full p-6 rounded-2xl border border-primary/15 bg-primary/5">
+                                        <p className="text-sm font-bold text-slate-900">Face ID / Huella aún no activada</p>
+                                        <p className="text-sm text-slate-600 mt-1">
+                                            Entra con clave una vez y registra el dispositivo en el panel.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Divider */}
+                            <div className="relative flex py-3 items-center mb-6">
+                                <div className="flex-grow border-t border-slate-200" />
+                                <span className="flex-shrink mx-4 text-slate-400 text-xs font-bold uppercase tracking-widest">
+                                    o con credenciales
+                                </span>
+                                <div className="flex-grow border-t border-slate-200" />
+                            </div>
+
+                            {/* Form */}
+                            <form
+                                className="space-y-5"
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    login();
+                                }}
+                            >
+                                {/* Email (decorativo) */}
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-sm font-bold text-slate-700 ml-1">Correo electrónico</label>
+                                    <div className="relative">
+                                        <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 !text-xl">
+                                            alternate_email
+                                        </span>
+                                        <input
+                                            disabled
+                                            className="w-full pl-12 pr-4 h-14 rounded-2xl border border-slate-200 bg-slate-50/70 text-slate-500 outline-none"
+                                            placeholder="admin@carolinetrenzas.com"
+                                            type="email"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Password */}
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex justify-between items-center ml-1">
+                                        <label className="text-sm font-bold text-slate-700">Contraseña</label>
+                                        <span className="text-xs font-semibold text-primary/70 select-none"> </span>
+                                    </div>
+
+                                    <div className="relative">
+                                        <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 !text-xl">
+                                            lock
+                                        </span>
+
+                                        <input
+                                            type={showPwd ? "text" : "password"}
+                                            value={pwd}
+                                            onChange={(e) => setPwd(e.target.value)}
+                                            placeholder="••••••••"
+                                            autoComplete="current-password"
+                                            inputMode="text"
+                                            className="w-full pl-12 pr-12 h-14 rounded-2xl border border-slate-200 bg-slate-50 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-slate-900 caret-slate-900"
+                                        />
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPwd((v) => !v)}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary"
+                                            aria-label={showPwd ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                        >
+                                            <span className="material-symbols-outlined !text-xl">
+                                                {showPwd ? "visibility_off" : "visibility"}
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+
 
                                 <button
-                                    type="button"
-                                    onClick={() => setShowPwd((v) => !v)}
-                                    className="absolute inset-y-0 right-3 my-auto size-9 rounded-full hover:bg-black/5 flex items-center justify-center"
-                                    aria-label={showPwd ? "Ocultar clave" : "Mostrar clave"}
+                                    type="submit"
+                                    disabled={loadingLogin || !pwd.trim()}
+                                    className="w-full h-14 bg-primary hover:bg-primary/90 text-white font-bold rounded-2xl shadow-lg shadow-primary/30 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                                 >
-                                    <span className="material-symbols-outlined text-xl text-[#89616f]">
-                                        {showPwd ? "visibility_off" : "visibility"}
-                                    </span>
+                                    {loadingLogin ? "Entrando..." : "Acceder al Panel"}
+                                    <span className="material-symbols-outlined">login</span>
                                 </button>
-                            </div>
-
-                            <button
-                                onClick={login}
-                                disabled={loadingLogin || !pwd.trim()}
-                                className="w-full rounded-xl bg-primary text-white font-bold py-3 hover:bg-primary/90 disabled:opacity-60"
-                            >
-                                {loadingLogin ? "Entrando..." : "Entrar con clave"}
-                            </button>
+                            </form>
                         </div>
+
+                        {/* Footer */}
+                        <p className="mt-8 text-center text-slate-500 text-sm font-medium">
+                            © 2024 Caroline Trenzas. Todos los derechos reservados.
+                        </p>
                     </div>
                 </div>
             </main>
@@ -1403,398 +1569,112 @@ export default function AdminPage() {
     }
 
     return (
-        <main className="min-h-screen p-4 sm:p-6 lg:p-12 bg-[#fdfafb]">
+        <>
             <ToastStack />
-            <BeforeAfterModal />
             <ConfirmDeleteModal state={confirmDelete} />
-            <TestimonialsModal
-                open={openT}
-                onClose={closeTestimonials}
-                pending={pending}
-                approved={approved}
-                loading={loadingT}
-                onRefresh={loadTestimonialsAdmin}
-                onApprove={approveTestimonial}
-                onReject={rejectTestimonial}
-            />
-            <div className="max-w-5xl mx-auto bg-white border rounded-2xl p-6 shadow-sm">
-                {isUploading ? (
-                    <div className="mb-4 rounded-2xl border bg-primary/5 p-4 flex items-center gap-3">
-                        <span className="inline-block h-4 w-4 animate-spin rounded-full border border-primary/30 border-t-primary" />
-                        <p className="text-sm font-bold text-[#181113]">{uploadingLabel || "Subiendo…"}</p>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                pushToast("info", "Subida en curso", "Si cerraste el widget, presiona 'Reset' para desbloquear.");
-                            }}
-                            className="ml-auto rounded-full border px-4 py-2 text-xs font-bold hover:bg-black/5"
-                        >
-                            ¿Qué pasa?
-                        </button>
-                    </div>
-                ) : null}
-                {/* HEADER RESPONSIVE */}
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                        <h1 className="text-2xl font-black mb-1">Subir fotos</h1>
-                        <p className="text-sm text-[#89616f]">
-                            Sube, revisa y elimina si te equivocaste. Sin tener que mendigar en Cloudinary.
-                        </p>
-                    </div>
 
-                    {/* Acciones (responsive) */}
-                    <div className="w-full sm:w-auto">
-                        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
-                            {canPasskey ? (
-                                hasPasskey ? (
-                                    <button
-                                        type="button"
-                                        disabled
-                                        className="col-span-2 sm:col-span-1 rounded-full border px-4 py-2 text-sm font-bold opacity-60 cursor-not-allowed"
-                                        title="Ya hay una passkey registrada"
-                                    >
-                                        ✅ Face ID
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={passkeyRegister}
-                                        disabled={loadingPasskey}
-                                        className="col-span-2 sm:col-span-1 rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
-                                    >
-                                        {loadingPasskey ? "Registrando..." : "Registrar Face ID / Huella"}
-                                    </button>
-                                )
-                            ) : null}
-
-                            <button
-                                onClick={refreshLatest}
-                                disabled={loadingLatest || isUploading}
-                                className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
-                            >
-                                {loadingLatest ? "Actualizando..." : "Actualizar"}
-                            </button>
-
-                            <button
-                                onClick={logout}
-                                disabled={isUploading}
-                                className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
-                            >
-                                Salir
-                            </button>
-
-                            {isUploading ? (
-                                <button
-                                    type="button"
-                                    disabled={!canReset}
-                                    onClick={() => {
-                                        stopUpload();
-                                        pushToast("info", "Estado reiniciado", "Se desbloquearon los botones.");
-                                    }}
-                                    className="col-span-2 sm:col-span-1 rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-50"
-                                    title={!canReset ? "Espera 20s por si la subida está en curso" : "Úsalo si quedó pegado"}
-                                >
-                                    Reset
-                                </button>
-                            ) : null}
-                        </div>
-                    </div>
-                </div>
-
-                {/* RESÚMENES (responsive) */}
-                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Antes y Después */}
-                    <div className="rounded-2xl border bg-white p-4">
-                        <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                                <p className="font-black text-[#181113]">Antes y Después</p>
-                                <p className="text-sm text-[#89616f] mt-1">
-                                    <span className="font-bold">{ba.length}</span> servicio(s) configurado(s)
-                                </p>
-                            </div>
-                            <span className="text-xs font-bold px-2 py-1 rounded-full bg-primary/10 text-primary shrink-0">
-                                Admin
-                            </span>
-                        </div>
-
-                        <div className="mt-4 grid grid-cols-2 gap-2">
-                            <button
-                                type="button"
-                                onClick={loadBeforeAfter}
-                                disabled={loadingBA}
-                                className="rounded-xl border px-3 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
-                            >
-                                {loadingBA ? "..." : "Actualizar"}
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setOpenBA(true)}
-                                className="rounded-xl bg-primary text-white px-3 py-2 text-sm font-bold hover:bg-primary/90"
-                            >
-                                Editar
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Testimonios */}
-                    <div className="rounded-2xl border bg-white p-4">
-                        <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                                <p className="font-black text-[#181113]">Testimonios</p>
-                                <p className="text-sm text-[#89616f] mt-1">
-                                    Pendientes: <span className="font-bold">{pending.length}</span> · Publicados:{" "}
-                                    <span className="font-bold">{approved.length}</span>/3
-                                </p>
-                            </div>
-                            <span className="text-xs font-bold px-2 py-1 rounded-full bg-primary/10 text-primary shrink-0">
-                                Admin
-                            </span>
-                        </div>
-
-                        <div className="mt-4 grid grid-cols-2 gap-2">
-                            <button
-                                type="button"
-                                onClick={loadTestimonialsAdmin}
-                                disabled={loadingT}
-                                className="rounded-xl border px-3 py-2 text-sm font-bold hover:bg-black/5 disabled:opacity-60"
-                            >
-                                {loadingT ? "..." : "Actualizar"}
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setOpenT(true)}
-                                className="rounded-xl bg-primary text-white px-3 py-2 text-sm font-bold hover:bg-primary/90"
-                            >
-                                Revisar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div className="mt-6 rounded-2xl border bg-[#fdfafb] p-4">
-                    <p className="font-bold text-[#181113]">👇 En Servicios: primero elige el servicio, después sube fotos.</p>
-                </div>
-
-                {/* ACCIONES */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                    <div className="rounded-2xl border p-6">
-                        <p className="font-bold">📸 Galería</p>
-                        <p className="text-sm text-[#89616f] mt-1">Sube 1 foto por vez (para evitar duplicados por accidente).</p>
-
-                        <button
-                            onClick={() => openUploader("gallery")}
-                            disabled={isUploading}
-                            className="mt-4 w-full rounded-xl bg-primary text-white font-bold py-3 disabled:opacity-60"
-                        >
-                            {uploading === "gallery" ? "Subiendo..." : "Subir 1 foto a Galería"}
-                        </button>
-
-                        <button
-                            onClick={() => openVideoUploader(true)}
-                            disabled={isUploading}
-                            className="mt-2 w-full rounded-xl border py-3 font-bold hover:bg-black/5 disabled:opacity-60"
-                            title="Estos aparecen arriba como Reels en la landing"
-                        >
-                            {uploading === "reel" ? "Subiendo..." : "⭐ Subir Reel (destacado)"}
-                        </button>
-                    </div>
-
-                    <div className="rounded-2xl border p-6">
-                        <p className="font-bold">✨ Servicios</p>
-                        <p className="text-sm text-[#89616f] mt-1">Estas fotos se asocian al servicio por el prefijo del nombre.</p>
-
-                        <label className="block text-xs font-semibold text-[#89616f] mt-4 mb-2">
-                            Servicio al que pertenece la foto
-                        </label>
-
-                        <select
-                            value={selectedServiceId}
-                            onChange={(e) => setSelectedServiceId(e.target.value)}
-                            disabled={uploading === "services"}
-                            className="w-full rounded-xl border px-4 py-3 text-sm"
-                        >
-                            {SERVICES.map((s) => (
-                                <option key={s.id} value={s.id}>
-                                    {s.title}
-                                </option>
-                            ))}
-                        </select>
-
-                        <button
-                            onClick={() => openUploader("services")}
-                            disabled={disableServicesButton || uploading === "services"}
-                            title={
-                                disableServicesButton
-                                    ? "Ya hay otra subida en curso. Termínala primero."
-                                    : uploading === "services"
-                                        ? "Subiendo fotos…"
-                                        : ""
-                            }
-                            className="mt-4 w-full rounded-xl bg-primary text-white font-bold py-3 disabled:opacity-60"
-                        >
-                            {uploading === "services" ? "Subiendo fotos…" : `Subir fotos de ${selectedTitle}`}
-                        </button>
-
-                        <p className="mt-3 text-xs text-[#89616f]">
-                            Quedan como <span className="font-mono">{selectedServiceId}-xxxxx</span>.
-                        </p>
-                    </div>
-                </div>
-
-                {/* SUBIDAS DE LA SESIÓN */}
-                <div className="mt-10">
-                    <div className="flex items-end justify-between gap-3 mb-4">
-                        <div>
-                            <h2 className="text-lg font-bold">Subidas de esta sesión</h2>
-                            <p className="text-sm text-[#89616f]">
-                                {sessionUploads.length === 0
-                                    ? "Lo que subas aquí aparece al tiro. Útil para deshacer sin entrar a Cloudinary."
-                                    : `Tienes ${sessionUploads.length} subida(s) en esta sesión.`}
-                            </p>
-                        </div>
-
-                        <div className="flex gap-2">
-                            {sessionUploads.length > 0 ? (
-                                <button
-                                    onClick={clearSessionUploads}
-                                    className="rounded-full border px-4 py-2 text-sm font-bold hover:bg-black/5"
-                                    title="Vacía la lista local (no borra en Cloudinary)"
-                                >
-                                    Limpiar sesión
-                                </button>
-                            ) : null}
-                        </div>
-                    </div>
-
-                    {sessionUploads.length === 0 ? (
-                        <div className="rounded-2xl border bg-[#fdfafb] p-6">
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-2xl bg-black/5 flex items-center justify-center">📦</div>
-                                <div>
-                                    <p className="font-bold">Sin subidas aún</p>
-                                    <p className="text-sm text-[#89616f]">Cuando subas algo, saldrá aquí con botón de eliminar rápido.</p>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {sessionUploads.map((img) => {
-                                const badge =
-                                    img.type === "gallery"
-                                        ? { label: "Galería", cls: "bg-white/90 text-black" }
-                                        : { label: `Servicio: ${img.serviceId}`, cls: "bg-black/80 text-white" };
-
-                                return (
-                                    <MediaCard
-                                        key={img.publicId}
-                                        src={img.src}
-                                        publicId={img.publicId}
-                                        badge={badge}
-                                        timeAgo={formatTimeAgo(img.createdAt)}
-                                        mediaType={img.mediaType}
-                                        onDelete={() =>
-                                            requestDelete({
-                                                publicId: img.publicId,
-                                                src: img.src,
-                                                mediaType: img.mediaType,
-                                                contextLabel: img.type === "gallery" ? "Galería" : `Servicio: ${img.serviceId}`,
-                                            })
-                                        }
-                                    />
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-
-                {/* ÚLTIMAS DESDE CLOUDINARY */}
-                <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Galería */}
-                    <div className="rounded-2xl border p-5">
-                        <div className="flex items-center justify-between">
-                            <h3 className="font-bold">Últimas en Galería</h3>
-                            <span className="text-xs text-[#89616f]">
-                                {galleryImages} fotos · {galleryVideos} videos
-                            </span>
-                        </div>
-
-                        {loadingLatest ? (
-                            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {Array.from({ length: 6 }).map((_, i) => (
-                                    <SkeletonCard key={i} />
-                                ))}
-                            </div>
-                        ) : galleryLatest.length === 0 ? (
-                            <div className="mt-3 rounded-xl border bg-[#fdfafb] p-4 text-sm text-[#89616f]">
-                                No hay contenido todavía.
-                            </div>
-                        ) : (
-                            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {galleryLatest.slice(0, 12).map((img) => (
-                                    <MediaCard
-                                        key={img.publicId}
-                                        src={img.src}
-                                        mediaType={img.mediaType}
-                                        publicId={img.publicId}
-                                        badge={{ label: "Galería", cls: "bg-white/90 text-black" }}
-                                        timeAgo={formatTimeAgo(img.createdAt)}
-                                        onDelete={() =>
-                                            requestDelete({
-                                                publicId: img.publicId,
-                                                src: img.src,
-                                                mediaType: img.mediaType,
-                                                contextLabel: "Galería",
-                                            })
-                                        }
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Servicios */}
-                    <div className="rounded-2xl border p-5">
-                        <div className="flex items-center justify-between">
-                            <h3 className="font-bold">Últimas en Servicios</h3>
-                            <span className="text-xs text-[#89616f]">{servicesLatest.length} fotos</span>
-                        </div>
-
-                        {loadingLatest ? (
-                            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {Array.from({ length: 6 }).map((_, i) => (
-                                    <SkeletonCard key={i} />
-                                ))}
-                            </div>
-                        ) : servicesLatest.length === 0 ? (
-                            <div className="mt-3 rounded-xl border bg-[#fdfafb] p-4 text-sm text-[#89616f]">
-                                No hay fotos todavía.
-                            </div>
-                        ) : (
-                            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {servicesLatest.slice(0, 12).map((img) => (
-                                    <MediaCard
-                                        key={img.publicId}
-                                        src={img.src}
-                                        publicId={img.publicId}
-                                        mediaType={img.mediaType}
-                                        badge={{ label: "Servicios", cls: "bg-black/80 text-white" }}
-                                        timeAgo={formatTimeAgo(img.createdAt)}
-                                        onDelete={() =>
-                                            requestDelete({
-                                                publicId: img.publicId,
-                                                src: img.src,
-                                                mediaType: img.mediaType,
-                                                contextLabel: "Servicios",
-                                            })
-                                        }
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </main>
+            <AdminShell
+                active={viewMeta.active}
+                onNavigate={(key) => {
+                    if (key === "dashboard") setView("dashboard");
+                    if (key === "gallery") setView("gallery");
+                    if (key === "services") setView("services");
+                    if (key === "beforeAfter") setView("beforeafter");
+                    if (key === "testimonials") setView("testimonials");
+                    if (key === "settings") setView("settings");
+                }}
+                onLogout={logout}
+                title={viewMeta.title}
+                subtitle={viewMeta.subtitle}
+                titleIcon={viewMeta.titleIcon}
+                search={viewMeta.search}
+                rightActions={viewMeta.rightActions}
+                user={viewMeta.user}
+            >
+                {view === "dashboard" ? (
+                    <DashboardView
+                        stats={{
+                            beforeAfterCount: ba.reduce(
+                                (acc, x) => acc + (x.before?.src ? 1 : 0) + (x.after?.src ? 1 : 0),
+                                0
+                            ),
+                            beforeAfterUpdatedText: "Actualizado recientemente",
+                            pendingTestimonials: pending.length,
+                            publishedTestimonials: approved.length,
+                        }}
+                        onUploadPhoto={() => openUploader("gallery")}
+                        onUploadReel={() => openVideoUploader(true)}
+                        recentItems={galleryLatest.slice(0, 12).map((m, idx) => ({
+                            id: m.publicId || String(idx),
+                            publicId: m.publicId || String(idx),
+                            title: "Galería",
+                            when: formatTimeAgo(m.createdAt),
+                            src: m.src,
+                            mediaType: (m.mediaType ?? "image") as "image" | "video",
+                            tag: (m.mediaType === "video" ? "Reel" : "Después") as "Reel" | "Después" | "Antes",
+                        }))}
+                        onDeleteRecent={(id) =>
+                            requestDelete({
+                                publicId: id,
+                                src: galleryLatest.find((x) => x.publicId === id)?.src,
+                                mediaType: galleryLatest.find((x) => x.publicId === id)?.mediaType,
+                                contextLabel: "Galería",
+                            })
+                        }
+                        onOpenBeforeAfter={() => setView("beforeafter")}
+                        onOpenTestimonials={() => setView("testimonials")}
+                    />
+                ) : view === "gallery" ? (
+                    <GalleryView
+                        items={galleryLatest}
+                        loading={loadingLatest}
+                        formatTimeAgo={formatTimeAgo}
+                        onDelete={(item) => requestDelete(item)}
+                        query={qGallery}
+                    />
+                ) : view === "services" ? (
+                    <ServicesView
+                        services={SERVICES}
+                        selectedServiceId={selectedServiceId}
+                        setSelectedServiceId={setSelectedServiceId}
+                        items={servicesLatest}
+                        loading={loadingLatest}
+                        onRefresh={refreshLatest}
+                        onUpload={() => openUploader("services")}
+                        onDelete={(item) => requestDelete(item)}
+                        formatTimeAgo={formatTimeAgo}
+                        query={qServices}
+                        setQuery={setQServices}
+                        onEditCategory={() => pushToast("info", "Próximamente", "Editar categoría lo dejamos para la siguiente vuelta.")}
+                    />
+                ) : view === "beforeafter" ? (
+                    <BeforeAfterEditorView
+                        services={SERVICES}
+                        ba={ba}
+                        loadingBA={loadingBA}
+                        onRefresh={loadBeforeAfter}
+                        onUploadSlot={(serviceId, title, slot) => openBAUploader(serviceId, title, slot)}
+                        onDeleteSlot={(serviceId, slot) => deleteBA(serviceId, slot)}
+                    />
+                ) : view === "settings" ? (
+                    <SettingsView
+                        canPasskey={canPasskey}
+                        hasPasskey={hasPasskey}
+                        loadingPasskey={loadingPasskey}
+                        onRegisterPasskey={passkeyRegister}
+                        onLogout={logout}
+                    />
+                ) : (
+                    <TestimonialsModerationView
+                        pending={pending}
+                        approved={approved}
+                        loading={loadingT}
+                        onRefresh={loadTestimonialsAdmin}
+                        onApprove={approveTestimonial}
+                        onReject={rejectTestimonial}
+                    />
+                )}
+            </AdminShell>
+        </>
     );
 }
