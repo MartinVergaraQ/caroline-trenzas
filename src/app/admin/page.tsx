@@ -724,6 +724,22 @@ export default function AdminPage() {
         setOpenT(false);
     }
 
+    function isUserCancelledPasskey(e: any) {
+        if (!e) return false;
+
+        // Cancelación común
+        if (e.name === "NotAllowedError") {
+            const msg = String(e.message || "").toLowerCase();
+            // si hay mensaje de cancelación, perfecto
+            if (msg.includes("cancel") || msg.includes("dismiss")) return true;
+            // en iOS muchas veces viene vacío, y aun así es cancel
+            return true;
+        }
+
+        const msg = String(e.message || "").toLowerCase();
+        return msg.includes("cancel") || msg.includes("dismiss");
+    }
+
     async function passkeyLogin() {
         setLoadingPasskey(true);
         setPasskeyStatus("working");
@@ -756,6 +772,15 @@ export default function AdminPage() {
             await refreshLatest();
         } catch (e: any) {
             console.error("PASSKEY LOGIN ERROR", e);
+
+            // Usuario apretó la X / canceló el prompt
+            if (isUserCancelledPasskey(e)) {
+                setPasskeyStatus("ready");     // vuelve a normal
+                pushToast("info", "Cancelado", "Puedes entrar con clave cuando quieras.");
+                return;
+            }
+
+            // Error real
             setPasskeyStatus("fail");
             pushToast("error", "Falló Face ID", e?.message || "Intenta otra vez.");
             resetPasskeyStatus(); // vuelve a "ready" después de un rato
