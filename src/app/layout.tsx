@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import { Toaster } from "sonner";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -44,6 +45,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
       <body className="bg-background-light dark:bg-background-dark text-[#181113] antialiased font-display">
         {children}
+
+        <Toaster
+          position="top-right"
+          richColors
+          closeButton
+          toastOptions={{
+            className:
+              "rounded-2xl border border-white/40 bg-white/70 backdrop-blur-md shadow-lg shadow-primary/10",
+            descriptionClassName: "text-[#89616f]",
+          }}
+        />
 
         <Script
           src="https://widget.cloudinary.com/v2.0/global/all.js"

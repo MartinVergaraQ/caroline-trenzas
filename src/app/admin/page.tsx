@@ -9,6 +9,7 @@ import TestimonialsModerationView from "@/components/admin/TestimonialsModeratio
 import GalleryView from "@/components/admin/GalleryView";
 import ServicesView from "@/components/admin/ServicesView";
 import SettingsView from "@/components/admin/SettingsView";
+import { alerts } from "@/lib/alerts";
 
 declare global {
     interface Window {
@@ -131,6 +132,7 @@ export default function AdminPage() {
     const [qGlobal, setQGlobal] = useState(""); // opcional, para dashboard/otros
     const [passkeyStatus, setPasskeyStatus] = useState<PasskeyStatus>("checking");
     const resetPasskeyTimer = useRef<number | null>(null);
+    const [isIOS, setIsIOS] = useState(false);
 
     const viewMeta = useMemo(() => {
         const user = { name: "Caroline T.", email: "caroline@trenzas.com" };
@@ -272,6 +274,11 @@ export default function AdminPage() {
         if (resetPasskeyTimer.current) window.clearTimeout(resetPasskeyTimer.current);
         resetPasskeyTimer.current = window.setTimeout(() => setPasskeyStatus("ready"), delay);
     }
+
+    useEffect(() => {
+        const ua = navigator.userAgent || "";
+        setIsIOS(/iPhone|iPad|iPod/i.test(ua));
+    }, []);
 
     useEffect(() => {
         return () => {
@@ -515,11 +522,6 @@ export default function AdminPage() {
             pushToast("error", "No se pudo eliminar", e?.message || "Mira consola.");
         }
     }
-    function pushToast(kind: ToastKind, title: string, detail?: string) {
-        const id = (globalThis.crypto?.randomUUID?.() ?? String(Date.now() + Math.random()));
-        setToasts((prev) => [{ id, kind, title, detail }, ...prev].slice(0, 4));
-        window.setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), kind === "error" ? 6000 : 3200);
-    }
 
     function ToastStack() {
         return (
@@ -620,6 +622,11 @@ export default function AdminPage() {
         setPasskeyStatus("ready");
     }, [canPasskey, hasPasskey]);
 
+    function pushToast(kind: ToastKind, title: string, detail?: string) {
+        if (kind === "success") return alerts.success(title, detail);
+        if (kind === "error") return alerts.error(title, detail);
+        return alerts.info(title, detail);
+    }
     function startUpload(kind: UploadingKind) {
         setUploading(kind);
         setUploadStartedAt(Date.now());
@@ -776,7 +783,6 @@ export default function AdminPage() {
             // Usuario apretó la X / canceló el prompt
             if (isUserCancelledPasskey(e)) {
                 setPasskeyStatus("ready");     // vuelve a normal
-                pushToast("info", "Cancelado", "Puedes entrar con clave cuando quieras.");
                 return;
             }
 
@@ -1046,6 +1052,11 @@ export default function AdminPage() {
         }
     }
 
+    function passkeyLabel() {
+        const ua = navigator.userAgent || "";
+        const isiOS = /iPhone|iPad|iPod/i.test(ua);
+        return isiOS ? "Entrar con Face ID / Huella" : "Entrar con Passkey";
+    }
     function openBAUploader(serviceId: string, title: string, slot: "before" | "after") {
         if (!cloudName) return pushToast("error", "Falta cloudName");
         if (!presetServices) return pushToast("error", "Falta preset", "Usa el mismo preset de imágenes o crea uno nuevo.");
@@ -1385,7 +1396,7 @@ export default function AdminPage() {
         const faceIdLabel = (() => {
             if (passkeyStatus === "checking") return "Comprobando Face ID…";
             if (passkeyStatus === "working") return "Abriendo Face ID…";
-            if (passkeyStatus === "ok") return "✅ Listo";
+            if (passkeyStatus === "ok") return "Listo";
             if (passkeyStatus === "fail") return hasPasskey ? "Falló. Intenta otra vez" : "Face ID no activado";
             return "Entrar con Face ID";
         })();
@@ -1450,7 +1461,7 @@ export default function AdminPage() {
                                             Face ID / Huella no disponible en este navegador.
                                         </p>
                                     </div>
-                                ) : hasPasskey ? (
+                                ) : (isIOS && hasPasskey) ? (
                                     <button
                                         type="button"
                                         onClick={async () => {

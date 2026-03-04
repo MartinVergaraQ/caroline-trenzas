@@ -9,10 +9,22 @@ import { redis } from "@/lib/adminSession";
 
 const CREDS_KEY = "admin:webauthn:creds";
 
+function isIOSUA(ua: string) {
+    return /iPhone|iPad|iPod/i.test(ua);
+}
+
 export async function POST(req: Request) {
     try {
         const guard = await requireAdmin(req);
         if (!guard.ok) return guard.res;
+
+        const ua = req.headers.get("user-agent") || "";
+        if (!isIOSUA(ua)) {
+            return NextResponse.json(
+                { ok: false, message: "El registro de Face ID se hace desde iPhone/iPad." },
+                { status: 400 }
+            );
+        }
 
         const body = await req.json();
 
@@ -38,16 +50,11 @@ export async function POST(req: Request) {
         const info: any = (verification as any).registrationInfo;
         const cred: any = info?.credential;
 
-        // ✅ ID REAL: del body (browser)
         const idB64url = String(body?.id || "").replace(/=+$/g, "");
         if (!idB64url) {
-            return NextResponse.json(
-                { ok: false, message: "body.id vacío (no llegó el credential id)" },
-                { status: 500 }
-            );
+            return NextResponse.json({ ok: false, message: "body.id vacío" }, { status: 500 });
         }
 
-        // ✅ PublicKey: de registrationInfo
         const publicKeyRaw =
             info?.credentialPublicKey ??
             cred?.publicKey ??
@@ -56,11 +63,7 @@ export async function POST(req: Request) {
 
         if (!publicKeyRaw) {
             return NextResponse.json(
-                {
-                    ok: false,
-                    message: "No vino credentialPublicKey",
-                    debug: { infoKeys: Object.keys(info || {}), credKeys: Object.keys(cred || {}) },
-                },
+                { ok: false, message: "No vino credentialPublicKey" },
                 { status: 500 }
             );
         }
@@ -74,27 +77,34 @@ export async function POST(req: Request) {
             : [...creds, { id: idB64url, publicKey: pkB64url, counter }];
 
         await setCreds(next);
-        await clearChallenge(); // ✅ ahora sí se ejecuta siempre
+        await clearChallenge();
 
-        // ✅ PRUEBA BRUTAL: lee Redis directo
         const raw = await redis.get(CREDS_KEY);
 
         return NextResponse.json({
             ok: true,
             count: next.length,
             debug: {
-                vercelEnv: process.env.VERCEL_ENV || null,
-                commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || null,
-                redisUrlHint: (process.env.KV_REST_API_URL || "").slice(0, 35),
                 wroteId: idB64url,
                 rawType: typeof raw,
                 rawPreview: typeof raw === "string" ? raw.slice(0, 220) : raw,
             },
         });
     } catch (e: any) {
+        const msg = String(e?.message || "");
+        // ✅ Este error es "normal" cuando el dispositivo no puede hacer UV
+        const isUv = msg.includes("User verification was required");
+
+        if (isUv) {
+            return NextResponse.json(
+                { ok: false, message: "No se pudo verificar al usuario. Activa Face ID/Touch ID/Windows Hello o registra desde iPhone." },
+                { status: 400 }
+            );
+        }
+
         console.error("REGISTER VERIFY ERROR", e);
         return NextResponse.json(
-            { ok: false, message: e?.message || "Error register/verify" },
+            { ok: false, message: msg || "Error register/verify" },
             { status: 500 }
         );
     }
