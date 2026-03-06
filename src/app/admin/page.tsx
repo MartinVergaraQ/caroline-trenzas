@@ -128,7 +128,7 @@ export default function AdminPage() {
     const [view, setView] = useState<AdminView>("dashboard");
     const [qGallery, setQGallery] = useState("");
     const [qServices, setQServices] = useState("");
-    const [qGlobal, setQGlobal] = useState(""); // opcional, para dashboard/otros
+
     const [passkeyStatus, setPasskeyStatus] = useState<PasskeyStatus>("checking");
     const resetPasskeyTimer = useRef<number | null>(null);
     const [isIOS, setIsIOS] = useState(false);
@@ -142,7 +142,11 @@ export default function AdminPage() {
                 title: "Galería",
                 titleIcon: "image",
                 subtitle: `${galleryImages} fotos · ${galleryVideos} videos`,
-                search: { value: qGallery, onChange: setQGallery, placeholder: "Buscar en galería..." },
+                search: {
+                    value: qGallery,
+                    onChange: setQGallery,
+                    placeholder: "Buscar en galería...",
+                },
                 rightActions: (
                     <>
                         <button
@@ -171,15 +175,6 @@ export default function AdminPage() {
                             <span className="material-symbols-outlined text-[20px]">movie</span>
                             <span className="hidden sm:inline">Subir Reel</span>
                         </button>
-
-                        <button
-                            type="button"
-                            className="ml-1 size-10 rounded-full bg-background-light border border-primary/10 flex items-center justify-center text-slate-600 relative"
-                            aria-label="Notificaciones"
-                        >
-                            <span className="material-symbols-outlined">notifications</span>
-                            <span className="absolute top-2 right-2 size-2 bg-primary rounded-full" />
-                        </button>
                     </>
                 ),
                 user,
@@ -192,26 +187,19 @@ export default function AdminPage() {
                 title: "Servicios",
                 titleIcon: "brush",
                 subtitle: "Gestión de Galería",
-                search: { value: qServices, onChange: setQServices, placeholder: "Buscar fotos o estilos..." },
+                search: {
+                    value: qServices,
+                    onChange: setQServices,
+                    placeholder: "Buscar fotos o estilos...",
+                },
                 rightActions: (
-                    <>
-                        <button
-                            type="button"
-                            className="size-10 rounded-full bg-background-light border border-primary/10 flex items-center justify-center text-slate-600 relative"
-                            aria-label="Notificaciones"
-                        >
-                            <span className="material-symbols-outlined">notifications</span>
-                            <span className="absolute top-2 right-2 size-2 bg-primary rounded-full" />
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={refreshLatest}
-                            className="bg-primary text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-primary/25 hover:scale-[1.03] transition-transform"
-                        >
-                            Actualizar
-                        </button>
-                    </>
+                    <button
+                        type="button"
+                        onClick={refreshLatest}
+                        className="bg-primary text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-primary/25 hover:scale-[1.03] transition-transform"
+                    >
+                        {loadingLatest ? "Actualizando..." : "Actualizar"}
+                    </button>
                 ),
                 user,
             };
@@ -223,51 +211,46 @@ export default function AdminPage() {
                 title: "Ajustes",
                 titleIcon: "settings",
                 subtitle: "Configuración del acceso y sesión",
-                search: { value: qGlobal, onChange: setQGlobal, placeholder: "Buscar..." },
-                rightActions: (
-                    <>
-                        <button
-                            type="button"
-                            className="size-10 rounded-full bg-background-light border border-primary/10 flex items-center justify-center text-slate-600"
-                            aria-label="Notificaciones"
-                        >
-                            <span className="material-symbols-outlined">notifications</span>
-                        </button>
-                        <div className="size-10 rounded-full bg-primary/20 border border-primary/20" />
-                    </>
-                ),
+                search: undefined,
+                rightActions: undefined,
                 user,
             };
         }
 
-        // default
+        if (view === "beforeafter") {
+            return {
+                active: "beforeAfter" as const,
+                title: "Antes/Después",
+                titleIcon: "compare",
+                subtitle: undefined,
+                search: undefined,
+                rightActions: undefined,
+                user,
+            };
+        }
+
+        if (view === "testimonials") {
+            return {
+                active: "testimonials" as const,
+                title: "Moderación",
+                titleIcon: "chat_bubble",
+                subtitle: undefined,
+                search: undefined,
+                rightActions: undefined,
+                user,
+            };
+        }
+
         return {
-            active:
-                view === "dashboard" ? ("dashboard" as const)
-                    : view === "beforeafter" ? ("beforeAfter" as const)
-                        : ("testimonials" as const),
-            title:
-                view === "dashboard" ? "Panel de Control"
-                    : view === "beforeafter" ? "Antes/Después"
-                        : "Moderación",
-            titleIcon:
-                view === "dashboard" ? "dashboard"
-                    : view === "beforeafter" ? "compare"
-                        : "chat_bubble",
+            active: "dashboard" as const,
+            title: "Panel de Control",
+            titleIcon: "dashboard",
             subtitle: undefined,
-            search: { value: qGlobal, onChange: setQGlobal, placeholder: "Buscar..." },
-            rightActions: (
-                <button
-                    type="button"
-                    className="size-10 rounded-full bg-background-light border border-primary/10 flex items-center justify-center text-slate-600"
-                    aria-label="Notificaciones"
-                >
-                    <span className="material-symbols-outlined">notifications</span>
-                </button>
-            ),
+            search: undefined,
+            rightActions: undefined,
             user,
         };
-    }, [view, qGallery, qServices, qGlobal, galleryImages, galleryVideos, loadingLatest]);
+    }, [view, qGallery, qServices, galleryImages, galleryVideos, loadingLatest]);
 
     function resetPasskeyStatus(delay = 2200) {
         if (resetPasskeyTimer.current) window.clearTimeout(resetPasskeyTimer.current);
@@ -1350,7 +1333,7 @@ export default function AdminPage() {
 
                         {/* Footer */}
                         <p className="mt-8 text-center text-slate-500 text-sm font-medium">
-                            © 2024 Caroline Trenzas. Todos los derechos reservados.
+                            © 2026 Caroline Trenzas. Todos los derechos reservados.
                         </p>
                     </div>
                 </div>

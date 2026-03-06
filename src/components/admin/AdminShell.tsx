@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-
+import Image from "next/image";
 type NavKey = "dashboard" | "gallery" | "services" | "beforeAfter" | "testimonials" | "settings";
 
 const NAV: { key: NavKey; label: string; icon: string }[] = [
@@ -65,9 +65,16 @@ export default function AdminShell({
         >
             {/* Brand */}
             <div className="p-6 flex items-center gap-3">
-                <div className="bg-primary/20 p-2 rounded-full">
-                    <span className="material-symbols-outlined text-primary">face_6</span>
+                <div className="w-12 h-12 rounded-full overflow-hidden bg-primary/20 shrink-0">
+                    <Image
+                        src="/clientes/caroline.jpg"
+                        alt="Foto de Caroline Trenzas"
+                        width={48}
+                        height={48}
+                        className="w-full h-full object-cover"
+                    />
                 </div>
+
                 <div className="min-w-0">
                     <h1 className="text-sm font-bold leading-tight truncate">Caroline Trenzas</h1>
                     <p className="text-xs text-slate-500">Admin Panel</p>
@@ -103,12 +110,14 @@ export default function AdminShell({
             {/* User footer (como en el mock) */}
             <div className="p-4 border-t border-primary/10">
                 <div className="flex items-center gap-3 p-2 rounded-2xl hover:bg-black/5 transition">
-                    <div className="size-10 rounded-full bg-primary/10 overflow-hidden flex items-center justify-center">
-                        {user?.avatarUrl ? (
-                            <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
-                        ) : (
-                            <span className="material-symbols-outlined text-primary">person</span>
-                        )}
+                    <div className="size-10 rounded-full bg-primary/10 overflow-hidden flex items-center justify-center shrink-0">
+                        <Image
+                            src="/clientes/caroline.jpg"
+                            alt="Foto de Caroline Trenzas"
+                            width={40}
+                            height={40}
+                            className="w-full h-full object-cover"
+                        />
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -180,20 +189,24 @@ export default function AdminShell({
 
                         <div className="flex items-center gap-3 shrink-0">
                             {/* Search (desktop) */}
-                            {search ? (
-                                <div className="hidden md:flex items-center bg-background-light rounded-full px-4 py-2 border border-primary/5">
-                                    <span className="material-symbols-outlined text-slate-400 text-[20px]">search</span>
-                                    <input
-                                        value={search.value}
-                                        onChange={(e) => search.onChange(e.target.value)}
-                                        className="bg-transparent border-none focus:ring-0 text-sm w-64 placeholder:text-slate-400"
-                                        placeholder={searchPlaceholder}
-                                        type="text"
-                                    />
+                            {(search || rightActions) ? (
+                                <div className="flex items-center gap-3 shrink-0">
+                                    {search ? (
+                                        <div className="hidden md:flex items-center bg-background-light rounded-full px-4 py-2 border border-primary/5">
+                                            <span className="material-symbols-outlined text-slate-400 text-[20px]">search</span>
+                                            <input
+                                                value={search.value}
+                                                onChange={(e) => search.onChange(e.target.value)}
+                                                className="bg-transparent border-none focus:ring-0 text-sm w-64 placeholder:text-slate-400"
+                                                placeholder={searchPlaceholder}
+                                                type="text"
+                                            />
+                                        </div>
+                                    ) : null}
+
+                                    {rightActions}
                                 </div>
                             ) : null}
-
-                            {rightActions}
                         </div>
                     </div>
 
