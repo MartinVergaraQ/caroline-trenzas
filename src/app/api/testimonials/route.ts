@@ -12,7 +12,10 @@ const MAX_PENDING = 50;
 
 function getIP(req: Request) {
     const xff = req.headers.get("x-forwarded-for");
-    return (xff ? xff.split(",")[0].trim() : "") || "unknown";
+    if (xff) return xff.split(",")[0].trim();
+    const real = req.headers.get("x-real-ip");
+    if (real) return real.trim();
+    return "unknown";
 }
 
 function sanitize(body: any) {
@@ -65,13 +68,18 @@ export async function POST(req: Request) {
     const ip = getIP(req);
     const rateKey = `${RATE_KEY_PREFIX}${ip}`;
 
-    // 1 envío cada 12 horas por IP
-    const already = await redis.get(rateKey);
-    if (already) {
-        return NextResponse.json(
-            { ok: false, message: "Ya recibimos tu testimonio. Gracias 💛" },
-            { status: 429 }
-        );
+    const isDev = process.env.NODE_ENV !== "production";
+
+    if (isDev) {
+        // En dev no rate-limit (para probar)
+    } else {
+        const already = await redis.get(rateKey);
+        if (already) {
+            return NextResponse.json(
+                { ok: false, message: "Ya recibimos tu testimonio. Gracias 💛" },
+                { status: 429 }
+            );
+        }
     }
 
     const body = await req.json().catch(() => ({}));
@@ -100,7 +108,10 @@ export async function POST(req: Request) {
     // siempre stringified
     await redis.lpush(PENDING_KEY, JSON.stringify(item));
     await redis.ltrim(PENDING_KEY, 0, MAX_PENDING - 1);
-    await redis.set(rateKey, "1", { ex: 60 * 60 * 12 });
+
+    if (!isDev) {
+        await redis.set(rateKey, "1", { ex: 60 * 60 * 12 });
+    }
 
     // Tip: si quieres que la landing “vea” al tiro los cambios al aprobar,
     // lo correcto es revalidar /api/testimonials (o el path donde consumes).

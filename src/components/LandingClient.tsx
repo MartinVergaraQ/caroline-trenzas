@@ -2,6 +2,7 @@
 
 import Modal from "@/components/modal";
 import WhatsAppLeadForm from "@/components/WhatsAppLeadForm";
+import { alerts } from "@/lib/alerts";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 
@@ -50,11 +51,33 @@ function ReviewForm({ onSent }: { onSent: () => void }) {
     const [text, setText] = useState("");
     const [sending, setSending] = useState(false);
     const [done, setDone] = useState(false);
-
+    const SENT_KEY = "ct_testimonial_sent_at";
+    const isDev = process.env.NODE_ENV !== "production";
+    const COOLDOWN_MS = isDev ? 10 * 1000 : 12 * 60 * 60 * 1000; // 10s en dev, 12h prod
     // honeypot invisible
     const [website, setWebsite] = useState("");
 
     const canSend = name.trim().length >= 2 && text.trim().length >= 6 && !sending;
+
+    useEffect(() => {
+        if (isDev) return;
+        try {
+            const raw = localStorage.getItem(SENT_KEY);
+            if (!raw) return;
+
+            const sentAt = Number(raw);
+            if (!Number.isFinite(sentAt)) return;
+
+            const age = Date.now() - sentAt;
+            if (age >= 0 && age < COOLDOWN_MS) {
+                setDone(true);
+            } else {
+                localStorage.removeItem(SENT_KEY);
+            }
+        } catch {
+            // si falla storage, no hacemos drama
+        }
+    }, [isDev, COOLDOWN_MS]);
 
     async function submit() {
         if (!canSend) return;
@@ -65,11 +88,28 @@ function ReviewForm({ onSent }: { onSent: () => void }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name, comuna, stars, text, website }),
             });
+            const data = await r.json().catch(() => ({}));
 
-            if (r.ok) {
-                setDone(true);
-                onSent();
+            if (!r.ok) {
+                if (r.status === 429) {
+                    alerts.info("Gracias 💛", data?.message || "Ya recibimos tu testimonio.");
+                    if (!isDev) {
+                        try { localStorage.setItem(SENT_KEY, String(Date.now())); } catch { }
+                    }
+                    setDone(true);
+                    return;
+                }
+
+                alerts.error("No se pudo enviar", data?.message || `HTTP ${r.status}`);
+                return;
             }
+
+            if (!isDev) {
+                try { localStorage.setItem(SENT_KEY, String(Date.now())); } catch { }
+            }
+
+            setDone(true);
+            onSent();
         } finally {
             setSending(false);
         }
@@ -210,6 +250,70 @@ function ReviewForm({ onSent }: { onSent: () => void }) {
                 </p>
             ) : null}
         </div>
+
+    );
+}
+function Stars({ n }: { n: number }) {
+    const full = "★★★★★".slice(0, Math.max(0, Math.min(5, n)));
+    const empty = "★★★★★".slice(0, 5 - Math.max(0, Math.min(5, n)));
+    return (
+        <p className="text-yellow-600 text-sm">
+            {full} <span className="text-black/10">{empty}</span>
+        </p>
+    );
+}
+
+function TestimonialsSection({
+    loading,
+    testimonials,
+}: {
+    loading: boolean;
+    testimonials: Testimonial[];
+}) {
+    return (
+        <section className="px-6 lg:px-40 py-16 bg-white">
+            <div className="max-w-[900px] mx-auto">
+                <div className="text-center mb-10">
+                    <h2 className="text-3xl font-bold mb-3">Testimonios</h2>
+                    <p className="text-[#89616f]">Mostramos máximo 3, elegidos y revisados.</p>
+                </div>
+
+                {loading ? (
+                    <div className="rounded-2xl border border-primary/10 bg-background-light p-10 text-center">
+                        <p className="text-[#89616f]">Cargando testimonios…</p>
+                    </div>
+                ) : testimonials.length === 0 ? (
+                    <div className="rounded-2xl border border-primary/10 bg-background-light p-10 text-center">
+                        <p className="text-[#89616f]">Todavía no hay testimonios publicados ✨</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {testimonials.slice(0, 3).map((t) => (
+                            <div
+                                key={t.id}
+                                className="rounded-2xl border border-primary/10 bg-white p-5 shadow-sm"
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <p className="font-black text-[#181113] truncate">{t.name}</p>
+                                        <p className="text-xs text-[#89616f]">{t.comuna}</p>
+                                    </div>
+                                    <span className="shrink-0 text-[11px] font-bold px-2 py-1 rounded-full bg-primary/10 text-primary">
+                                        {new Date(t.createdAt).toLocaleDateString("es-CL")}
+                                    </span>
+                                </div>
+
+                                <div className="mt-2">
+                                    <Stars n={t.stars} />
+                                </div>
+
+                                <p className="mt-3 text-sm text-[#181113] leading-relaxed">“{t.text}”</p>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </section>
     );
 }
 
@@ -370,7 +474,7 @@ export default function LandingClient() {
 
     useEffect(() => {
         setLoadingServices(true);
-        fetch("/api/services")
+        fetch("/api/services", { cache: "no-store" })
             .then((r) => r.json())
             .then((data) => setServices(data.services || []))
             .catch(() => setServices([]))
@@ -383,7 +487,7 @@ export default function LandingClient() {
     async function refreshTestimonials() {
         setLoadingTestimonials(true);
         try {
-            const r = await fetch("/api/testimonials");
+            const r = await fetch(`/api/testimonials?t=${Date.now()}`, { cache: "no-store" });
             const d = await r.json().catch(() => ({}));
             setTestimonials(d.testimonials || []);
         } catch {
@@ -957,12 +1061,15 @@ export default function LandingClient() {
                         </div>
                     </div>
                 </section>
-                {/* Review Form (siempre visible) */}
+                {/* Review Form */}
                 <section className="px-6 lg:px-40 py-16 bg-white">
                     <div className="max-w-[900px] mx-auto">
                         <ReviewForm onSent={refreshTestimonials} />
                     </div>
                 </section>
+
+                {/* Testimonials */}
+                <TestimonialsSection loading={loadingTestimonials} testimonials={testimonials} />
 
                 {/* Gallery Section */}
                 <section id="galeria" className="scroll-mt-24 px-6 lg:px-40 py-20 bg-white">

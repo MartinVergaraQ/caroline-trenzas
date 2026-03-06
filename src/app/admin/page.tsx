@@ -122,7 +122,6 @@ export default function AdminPage() {
     const [approved, setApproved] = useState<PendingTestimonial[]>([]);
     const [loadingT, setLoadingT] = useState(false);
     const [openT, setOpenT] = useState(false);
-    const closeTestimonials = useCallback(() => setOpenT(false), []);
     const [ba, setBa] = useState<BAEntry[]>([]);
     const [loadingBA, setLoadingBA] = useState(false);
     const [openBA, setOpenBA] = useState(false);
@@ -300,178 +299,6 @@ export default function AdminPage() {
         }
     }
 
-    function TestimonialsModal({
-        open,
-        onClose,
-        pending,
-        approved,
-        loading,
-        onRefresh,
-        onApprove,
-        onReject,
-    }: {
-        open: boolean;
-        onClose: () => void;
-        pending: PendingTestimonial[];
-        approved: PendingTestimonial[];
-        loading: boolean;
-        onRefresh: () => void;
-        onApprove: (id: string) => void;
-        onReject: (id: string) => void;
-    }) {
-        // Bloquea scroll body (solo cuando modal abierto)
-        useEffect(() => {
-            if (!open) return;
-            const prev = document.body.style.overflow;
-            document.body.style.overflow = "hidden";
-            return () => {
-                document.body.style.overflow = prev;
-            };
-        }, [open]);
-
-        // Escape para cerrar
-        useEffect(() => {
-            if (!open) return;
-            const onKeyDown = (e: KeyboardEvent) => {
-                if (e.key === "Escape") onClose();
-            };
-            window.addEventListener("keydown", onKeyDown);
-            return () => window.removeEventListener("keydown", onKeyDown);
-        }, [open, onClose]);
-
-        if (!open) return null;
-
-        return (
-            <div className="fixed inset-0 z-[9999]">
-                <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-
-                <div className="absolute inset-0 flex items-start justify-center p-4 pt-10 md:items-center md:pt-4">
-                    <div
-                        className="w-full max-w-3xl rounded-2xl border bg-white shadow-lg overflow-hidden"
-                        onClick={(e) => e.stopPropagation()}
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label="Testimonios"
-                    >
-                        <div className="p-5 border-b bg-[#fdfafb] flex items-center justify-between">
-                            <div>
-                                <p className="font-black text-lg">Testimonios</p>
-                                <p className="text-sm text-[#89616f]">
-                                    Pendientes: {pending.length} · Publicados: {approved.length}/3
-                                </p>
-                            </div>
-
-                            <button
-                                className="rounded-full size-10 hover:bg-black/5 flex items-center justify-center"
-                                onClick={onClose}
-                                aria-label="Cerrar"
-                                type="button"
-                            >
-                                <span className="material-symbols-outlined">close</span>
-                            </button>
-                        </div>
-
-                        <div className="p-5 max-h-[75vh] overflow-auto space-y-8">
-                            {/* Pendientes */}
-                            <div>
-                                <div className="flex items-center justify-between mb-3">
-                                    <p className="font-bold">Pendientes</p>
-                                    <button
-                                        type="button"
-                                        onClick={onRefresh}
-                                        disabled={loading}
-                                        className="rounded-full border px-3 py-1.5 text-xs font-bold hover:bg-black/5 disabled:opacity-60"
-                                    >
-                                        {loading ? "Actualizando..." : "Actualizar"}
-                                    </button>
-                                </div>
-
-                                {pending.length === 0 ? (
-                                    <div className="rounded-xl border bg-[#fdfafb] p-4 text-sm text-[#89616f]">
-                                        No hay testimonios pendientes.
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {pending.map((t) => (
-                                            <div key={t.id} className="rounded-2xl border bg-[#fdfafb] p-4">
-                                                <p className="font-bold text-[#181113]">
-                                                    {t.name}{" "}
-                                                    <span className="text-sm text-[#89616f] font-medium">· {t.comuna}</span>
-                                                </p>
-
-                                                <p className="text-yellow-600 text-sm">
-                                                    {"★★★★★".slice(0, t.stars)}{" "}
-                                                    <span className="text-black/10">{"★★★★★".slice(0, 5 - t.stars)}</span>
-                                                </p>
-
-                                                <p className="mt-2 text-sm text-[#181113]">“{t.text}”</p>
-                                                <p className="mt-2 text-xs text-[#89616f]">
-                                                    {new Date(t.createdAt).toLocaleString()}
-                                                </p>
-
-                                                <div className="mt-3 flex gap-2">
-                                                    <button
-                                                        className="rounded-xl bg-primary text-white px-4 py-2 text-sm font-bold hover:bg-primary/90 disabled:opacity-50"
-                                                        onClick={() => onApprove(t.id)}
-                                                        disabled={approved.length >= 3}
-                                                        title={approved.length >= 3 ? "Ya hay 3 publicados. Rechaza uno primero." : ""}
-                                                        type="button"
-                                                    >
-                                                        Aprobar
-                                                    </button>
-
-                                                    <button
-                                                        className="rounded-xl border px-4 py-2 text-sm font-bold hover:bg-black/5"
-                                                        onClick={() => onReject(t.id)}
-                                                        type="button"
-                                                    >
-                                                        Rechazar
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Publicados */}
-                            <div>
-                                <p className="font-bold mb-3">Publicados (máx 3)</p>
-
-                                {approved.length === 0 ? (
-                                    <div className="rounded-xl border bg-[#fdfafb] p-4 text-sm text-[#89616f]">
-                                        No hay testimonios publicados.
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                        {approved.map((t) => (
-                                            <div key={t.id} className="rounded-2xl border bg-white p-4">
-                                                <p className="font-bold text-[#181113]">{t.name}</p>
-                                                <p className="text-xs text-[#89616f]">{t.comuna}</p>
-                                                <p className="text-yellow-600 text-sm mt-1">{"★★★★★".slice(0, t.stars)}</p>
-                                                <p className="text-sm text-[#181113] mt-2 line-clamp-4">“{t.text}”</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="p-4 border-t bg-white flex justify-end">
-                            <button
-                                className="rounded-xl border px-4 py-2 text-sm font-bold hover:bg-black/5"
-                                onClick={onClose}
-                                type="button"
-                            >
-                                Cerrar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
     async function loadTestimonialsAdmin() {
         setLoadingT(true);
         try {
@@ -514,9 +341,21 @@ export default function AdminPage() {
                 credentials: "include",
                 cache: "no-store",
             });
+
             const d = await r.json().catch(() => ({}));
             if (!r.ok) throw new Error(d?.message || `HTTP ${r.status}`);
-            pushToast("success", "Eliminado", "Se quitó de pendientes.");
+
+            const detail =
+                d?.removedFrom === "approved"
+                    ? "Se quitó del landing (publicados)."
+                    : d?.removedFrom === "pending"
+                        ? "Se quitó de pendientes."
+                        : d?.removedFrom === "both"
+                            ? "Se quitó de pendientes y publicados."
+                            : "No se encontró para eliminar.";
+
+            pushToast("success", "Eliminado", detail);
+
             await loadTestimonialsAdmin();
         } catch (e: any) {
             pushToast("error", "No se pudo eliminar", e?.message || "Mira consola.");
@@ -1233,91 +1072,6 @@ export default function AdminPage() {
         widget.open();
     }
 
-    // ---------- UI components ----------
-    function SkeletonCard() {
-        return (
-            <div className="rounded-2xl border bg-white overflow-hidden shadow-sm">
-                <div className="aspect-square bg-black/5 animate-pulse" />
-                <div className="p-3">
-                    <div className="h-3 w-3/4 bg-black/5 rounded animate-pulse" />
-                    <div className="mt-3 h-8 w-full bg-black/5 rounded-xl animate-pulse" />
-                </div>
-            </div>
-        );
-    }
-
-    function MediaCard({
-        src,
-        publicId,
-        badge,
-        timeAgo,
-        mediaType = "image",
-        onDelete,
-    }: {
-        src: string;
-        publicId: string;
-        badge: { label: string; cls: string };
-        timeAgo?: string;
-        mediaType?: "image" | "video";
-        onDelete: () => void;
-    }) {
-
-        return (
-            <div className="group rounded-2xl border bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                <div className="relative aspect-square bg-black/5">
-                    {mediaType === "video" ? (
-                        <video
-                            src={src}
-                            controls
-                            playsInline
-                            preload="metadata"
-                            className="h-full w-full object-cover"
-                        />
-                    ) : (
-                        <img
-                            src={src}
-                            alt={publicId}
-                            className="h-full w-full object-cover group-hover:scale-[1.02] transition-transform"
-                            loading="lazy"
-                        />
-                    )}
-
-                    <div
-                        className={`absolute left-2 top-2 text-[11px] font-bold px-2 py-1 rounded-full ${badge.cls}`}
-                    >
-                        {badge.label}
-                    </div>
-
-                    {mediaType === "video" ? (
-                        <div className="absolute left-2 bottom-2 text-[11px] font-bold px-2 py-1 rounded-full bg-white/90 text-black">
-                            VIDEO
-                        </div>
-                    ) : null}
-
-                    {timeAgo ? (
-                        <div className="absolute right-2 top-2 text-[11px] font-bold px-2 py-1 rounded-full bg-white/90 text-black">
-                            {timeAgo}
-                        </div>
-                    ) : null}
-
-                    <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-
-                <div className="p-3">
-                    <p className="text-xs text-[#89616f] truncate" title={publicId}>
-                        {publicId}
-                    </p>
-
-                    <button
-                        onClick={onDelete}
-                        className="mt-3 w-full rounded-xl border py-2 text-xs font-bold hover:bg-black/5 active:scale-[0.99] transition"
-                    >
-                        Eliminar
-                    </button>
-                </div>
-            </div>
-        );
-    }
 
     function ConfirmDeleteModal({ state }: { state: ConfirmDeleteState }) {
         if (!state) return null;

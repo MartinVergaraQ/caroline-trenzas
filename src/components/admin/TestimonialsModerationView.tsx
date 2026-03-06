@@ -40,7 +40,7 @@ function StarsSmall({ n }: { n: number }) {
         <div className="flex text-amber-400 gap-0.5">
             {Array.from({ length: 5 }).map((_, i) => (
                 <span key={i} className="material-symbols-outlined text-sm">
-                    {i < filled ? "star" : "star"}
+                    {i < filled ? "star" : "star_outline"}
                 </span>
             ))}
         </div>
@@ -142,10 +142,9 @@ export default function TestimonialsModerationView({
 
     return (
         <div className="relative">
-            <div className="flex h-[calc(100vh-64px)] overflow-hidden rounded-2xl border border-primary/10 bg-white">
+            <div className="flex h-[calc(100vh-64px)] min-h-0 overflow-hidden rounded-2xl border border-primary/10 bg-white">
                 {/* LEFT LIST */}
-                <section className="w-full md:w-[420px] border-b md:border-b-0 md:border-r border-primary/10 flex flex-col bg-white">
-                    {/* Header */}
+                <section className="w-full md:w-[420px] min-h-0 border-b md:border-b-0 md:border-r border-primary/10 flex flex-col bg-white">                    {/* Header */}
                     <div className="p-4 sm:p-6 space-y-4 border-b border-primary/10 bg-white/80 backdrop-blur-md">
                         <div className="flex items-center justify-between gap-3">
                             <div className="flex items-center gap-2 min-w-0">
@@ -236,61 +235,60 @@ export default function TestimonialsModerationView({
                     </div>
 
                     {/* Items */}
-                    <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3">
-                        {filtered.length === 0 ? (
-                            <div className="rounded-2xl border bg-background-light p-4 text-sm text-slate-600">
-                                No hay resultados.
-                            </div>
-                        ) : (
-                            filtered.map((t) => {
-                                const isSelected = selected?.id === t.id;
+                    <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-3">                        {filtered.length === 0 ? (
+                        <div className="rounded-2xl border bg-background-light p-4 text-sm text-slate-600">
+                            No hay resultados.
+                        </div>
+                    ) : (
+                        filtered.map((t) => {
+                            const isSelected = selected?.id === t.id;
 
-                                return (
-                                    <button
-                                        key={t.id}
-                                        type="button"
-                                        onClick={() => {
-                                            setSelectedId(t.id);
-                                            setDetailOpenMobile(true);
-                                        }}
-                                        className={cn(
-                                            "w-full text-left p-4 rounded-2xl transition-all border bg-white shadow-sm",
-                                            isSelected
-                                                ? "border-primary ring-4 ring-primary/10"
-                                                : "border-primary/10 hover:border-primary/30 hover:shadow-md"
+                            return (
+                                <button
+                                    key={t.id}
+                                    type="button"
+                                    onClick={() => {
+                                        setSelectedId(t.id);
+                                        setDetailOpenMobile(true);
+                                    }}
+                                    className={cn(
+                                        "w-full text-left p-4 rounded-2xl transition-all border bg-white shadow-sm",
+                                        isSelected
+                                            ? "border-primary ring-4 ring-primary/10"
+                                            : "border-primary/10 hover:border-primary/30 hover:shadow-md"
+                                    )}
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="font-black text-slate-900 truncate">{t.name}</p>
+                                            <p className="text-xs text-slate-500 truncate">{t.comuna}</p>
+                                        </div>
+                                        <span className="text-[10px] text-slate-400 shrink-0">{timeAgo(t.createdAt)}</span>
+                                    </div>
+
+                                    <p className="mt-2 text-sm text-slate-600 line-clamp-2 italic">“{t.text}”</p>
+
+                                    <div className="mt-3 flex items-center justify-between">
+                                        <StarsSmall n={t.stars} />
+                                        {mode === "pending" ? (
+                                            <span className="px-2 py-1 bg-amber-100 text-amber-700 text-[10px] rounded-full font-black uppercase">
+                                                Nuevo
+                                            </span>
+                                        ) : (
+                                            <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] rounded-full font-black uppercase">
+                                                Publicado
+                                            </span>
                                         )}
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <p className="font-black text-slate-900 truncate">{t.name}</p>
-                                                <p className="text-xs text-slate-500 truncate">{t.comuna}</p>
-                                            </div>
-                                            <span className="text-[10px] text-slate-400 shrink-0">{timeAgo(t.createdAt)}</span>
-                                        </div>
-
-                                        <p className="mt-2 text-sm text-slate-600 line-clamp-2 italic">“{t.text}”</p>
-
-                                        <div className="mt-3 flex items-center justify-between">
-                                            <StarsSmall n={t.stars} />
-                                            {mode === "pending" ? (
-                                                <span className="px-2 py-1 bg-amber-100 text-amber-700 text-[10px] rounded-full font-black uppercase">
-                                                    Nuevo
-                                                </span>
-                                            ) : (
-                                                <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] rounded-full font-black uppercase">
-                                                    Publicado
-                                                </span>
-                                            )}
-                                        </div>
-                                    </button>
-                                );
-                            })
-                        )}
+                                    </div>
+                                </button>
+                            );
+                        })
+                    )}
                     </div>
                 </section>
 
                 {/* RIGHT DETAIL (desktop) */}
-                <section className="hidden md:flex flex-1 bg-white overflow-hidden">
+                <section className="hidden md:flex flex-1 min-h-0 bg-white">
                     <DetailPanel
                         mode={mode}
                         selected={selected}
@@ -402,74 +400,78 @@ function DetailPanel({
     }
 
     return (
-        <div className={cn("flex-1 overflow-hidden", compact ? "p-4" : "p-10")}>
-            <div className={cn("max-w-3xl mx-auto", compact ? "" : "")}>
-                {mode === "pending" && publishedLimitReached ? (
-                    <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-2xl flex items-start gap-3">
-                        <span className="material-symbols-outlined text-primary mt-0.5">info</span>
-                        <p className="text-sm text-slate-700">
-                            <span className="font-black">Límite alcanzado:</span> tienes{" "}
-                            <span className="text-primary font-black">{approvedCount}</span>/{maxPublished} publicados.
-                            Para aprobar este, primero rechaza uno anterior.
-                        </p>
-                    </div>
-                ) : null}
+        <div className={cn("flex-1 min-h-0 flex flex-col", compact ? "p-4" : "p-10")}>
+            {/* CONTENIDO (scrollea) */}
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+                <div className="max-w-3xl mx-auto">
+                    {/* TODO tu contenido actual: warning, header, content, map... */}
 
-                {/* Header */}
-                <div className="flex items-center gap-5 mb-8">
-                    <div className="size-20 rounded-full bg-background-light border border-primary/10 flex items-center justify-center font-black text-slate-700">
-                        {initials(selected.name)}
-                    </div>
+                    {mode === "pending" && publishedLimitReached ? (
+                        <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-2xl flex items-start gap-3">
+                            <span className="material-symbols-outlined text-primary mt-0.5">info</span>
+                            <p className="text-sm text-slate-700">
+                                <span className="font-black">Límite alcanzado:</span> tienes{" "}
+                                <span className="text-primary font-black">{approvedCount}</span>/{maxPublished} publicados.
+                                Para aprobar este, primero rechaza uno anterior.
+                            </p>
+                        </div>
+                    ) : null}
 
-                    <div className="min-w-0">
-                        <h3 className="text-2xl sm:text-3xl font-black truncate">{selected.name}</h3>
+                    {/* Header */}
+                    <div className="flex items-center gap-5 mb-8">
+                        <div className="size-20 rounded-full bg-background-light border border-primary/10 flex items-center justify-center font-black text-slate-700">
+                            {initials(selected.name)}
+                        </div>
 
-                        <div className="flex flex-wrap items-center gap-4 text-slate-500 mt-1">
-                            <div className="flex items-center gap-1">
-                                <span className="material-symbols-outlined text-sm">calendar_today</span>
-                                <span className="text-sm">{new Date(selected.createdAt).toLocaleDateString()}</span>
-                            </div>
+                        <div className="min-w-0">
+                            <h3 className="text-2xl sm:text-3xl font-black truncate">{selected.name}</h3>
 
-                            <div className="flex items-center gap-1">
-                                <span className="material-symbols-outlined text-sm">location_on</span>
-                                <span className="text-sm">{selected.comuna}</span>
+                            <div className="flex flex-wrap items-center gap-4 text-slate-500 mt-1">
+                                <div className="flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-sm">calendar_today</span>
+                                    <span className="text-sm">{new Date(selected.createdAt).toLocaleDateString()}</span>
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-sm">location_on</span>
+                                    <span className="text-sm">{selected.comuna}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Content */}
-                <div className="rounded-2xl border border-primary/10 bg-white shadow-sm p-6 sm:p-8">
-                    <StarsBig n={selected.stars} />
+                    {/* Content */}
+                    <div className="rounded-2xl border border-primary/10 bg-white shadow-sm p-6 sm:p-8">
+                        <StarsBig n={selected.stars} />
 
-                    <div className="relative mt-6">
-                        <span className="material-symbols-outlined absolute -top-6 -left-6 text-primary/15 text-7xl">
-                            format_quote
-                        </span>
-                        <p className="text-lg sm:text-2xl leading-relaxed text-slate-700 italic font-light">
-                            “{selected.text}”
-                        </p>
-                    </div>
+                        <div className="relative mt-6">
+                            <span className="material-symbols-outlined absolute -top-6 -left-6 text-primary/15 text-7xl">
+                                format_quote
+                            </span>
+                            <p className="text-lg sm:text-2xl leading-relaxed text-slate-700 italic font-light">
+                                “{selected.text}”
+                            </p>
+                        </div>
 
-                    {/* Map placeholder */}
-                    <div className="mt-8 rounded-2xl overflow-hidden h-44 bg-slate-100 border border-primary/10 relative">
-                        <div className="absolute inset-0 bg-gradient-to-br from-slate-200/50 to-slate-100/50" />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="bg-white/85 px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
-                                <span className="material-symbols-outlined text-primary">location_on</span>
-                                <span className="font-black text-sm">Ubicación de la reseña: {selected.comuna}</span>
+                        <div className="mt-8 rounded-2xl overflow-hidden h-44 bg-slate-100 border border-primary/10 relative">
+                            <div className="absolute inset-0 bg-gradient-to-br from-slate-200/50 to-slate-100/50" />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="bg-white/85 px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">location_on</span>
+                                    <span className="font-black text-sm">Ubicación de la reseña: {selected.comuna}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Sticky Actions */}
-                <div
-                    className={cn(
-                        "mt-6 flex flex-col sm:flex-row gap-4",
-                        compact ? "pb-6" : ""
-                    )}
-                >
+                    {/* padding extra para que no quede pegado a acciones */}
+                    <div className="h-6" />
+                </div>
+            </div>
+
+            {/* ACCIONES (siempre visibles) */}
+            <div className={cn("border-t bg-white pt-4", compact ? "pb-6" : "")}>
+                <div className="max-w-3xl mx-auto flex flex-col sm:flex-row gap-4">
                     {mode === "pending" ? (
                         <button
                             type="button"
@@ -497,8 +499,8 @@ function DetailPanel({
                         onClick={() => onReject(selected.id)}
                         className="flex-1 py-4 rounded-2xl bg-white border-2 border-slate-200 text-slate-700 font-black text-base flex items-center justify-center gap-2 hover:bg-slate-50 transition"
                     >
-                        <span className="material-symbols-outlined">cancel</span>
-                        Rechazar
+                        <span className="material-symbols-outlined">delete</span>
+                        {mode === "approved" ? "Eliminar de la web" : "Rechazar"}
                     </button>
                 </div>
             </div>
