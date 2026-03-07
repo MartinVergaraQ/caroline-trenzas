@@ -10,6 +10,8 @@ import GalleryView from "@/components/admin/GalleryView";
 import ServicesView from "@/components/admin/ServicesView";
 import SettingsView from "@/components/admin/SettingsView";
 import { alerts } from "@/lib/alerts";
+import ContentView from "@/components/admin/ContentView";
+import type { LandingContent } from "@/lib/landing-content";
 
 declare global {
     interface Window {
@@ -78,7 +80,14 @@ type BAEntry = {
     updatedAt?: string;
 };
 
-type AdminView = "dashboard" | "gallery" | "services" | "beforeafter" | "testimonials" | "settings";
+type AdminView =
+    | "dashboard"
+    | "gallery"
+    | "services"
+    | "beforeafter"
+    | "testimonials"
+    | "settings"
+    | "content";
 
 type PasskeyStatus = "idle" | "checking" | "ready" | "working" | "ok" | "fail";
 
@@ -132,9 +141,9 @@ export default function AdminPage() {
     const [passkeyStatus, setPasskeyStatus] = useState<PasskeyStatus>("checking");
     const resetPasskeyTimer = useRef<number | null>(null);
     const [isIOS, setIsIOS] = useState(false);
-
     const viewMeta = useMemo(() => {
         const user = { name: "Caroline T.", email: "caroline@trenzas.com" };
+
 
         if (view === "gallery") {
             return {
@@ -205,6 +214,17 @@ export default function AdminPage() {
             };
         }
 
+        if (view === "content") {
+            return {
+                active: "content" as const,
+                title: "Contenido",
+                titleIcon: "edit_note",
+                subtitle: "Textos editables de la landing",
+                search: undefined,
+                rightActions: undefined,
+                user,
+            };
+        }
         if (view === "settings") {
             return {
                 active: "settings" as const,
@@ -531,8 +551,13 @@ export default function AdminPage() {
 
             setAuthed(true);
             setPwd("");
-            pushToast("success", "Listo", "Ya puedes subir fotos");
-            await refreshLatest();
+            pushToast("success", "Listo", "Ya puedes entrar al panel");
+
+            await Promise.all([
+                refreshLatest(),
+                loadTestimonialsAdmin(),
+                loadBeforeAfter()
+            ]);
         } finally {
             setLoadingLogin(false);
         }
@@ -598,7 +623,12 @@ export default function AdminPage() {
             setPasskeyStatus("ok");
             setAuthed(true);
             pushToast("success", "Listo", "Entraste con Face ID / Huella.");
-            await refreshLatest();
+
+            await Promise.all([
+                refreshLatest(),
+                loadTestimonialsAdmin(),
+                loadBeforeAfter(),
+            ]);
         } catch (e: any) {
             console.error("PASSKEY LOGIN ERROR", e);
 
@@ -1355,6 +1385,7 @@ export default function AdminPage() {
                     if (key === "beforeAfter") setView("beforeafter");
                     if (key === "testimonials") setView("testimonials");
                     if (key === "settings") setView("settings");
+                    if (key === "content") setView("content");
                 }}
                 onLogout={logout}
                 title={viewMeta.title}
@@ -1429,6 +1460,8 @@ export default function AdminPage() {
                         onUploadSlot={(serviceId, title, slot) => openBAUploader(serviceId, title, slot)}
                         onDeleteSlot={(serviceId, slot) => deleteBA(serviceId, slot)}
                     />
+                ) : view === "content" ? (
+                    <ContentView />
                 ) : view === "settings" ? (
                     <SettingsView
                         canPasskey={canPasskey}

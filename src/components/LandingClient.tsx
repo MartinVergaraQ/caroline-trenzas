@@ -5,6 +5,7 @@ import WhatsAppLeadForm from "@/components/WhatsAppLeadForm";
 import { alerts } from "@/lib/alerts";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import { defaultLandingContent, type LandingContent } from "@/lib/landing-content";
 
 type GalleryItem = {
     publicId: string;
@@ -25,8 +26,6 @@ type BAEntry = {
     after?: { publicId: string; src: string };
 };
 
-const WA_PHONE = "+56974011961";
-
 const buildWhatsAppText = (service?: string) => {
     const s = service ? `Hola! Quiero cotizar ${service}.` : "Hola! Quiero cotizar un servicio.";
     const extra = service ? `\n\nSi puedes, envíame una foto del estilo de ${service} que te gustaría.` : "";
@@ -44,7 +43,13 @@ const buildWhatsAppText = (service?: string) => {
 const waLink = (phone: string, text: string) =>
     `https://wa.me/${phone.replace(/[^\d]/g, "")}?text=${encodeURIComponent(text)}`;
 
-function ReviewForm({ onSent }: { onSent: () => void }) {
+function ReviewForm({
+    onSent,
+    content,
+}: {
+    onSent: () => void;
+    content: LandingContent["reviewForm"];
+}) {
     const [name, setName] = useState("");
     const [comuna, setComuna] = useState("San Bernardo");
     const [stars, setStars] = useState(5);
@@ -121,9 +126,9 @@ function ReviewForm({ onSent }: { onSent: () => void }) {
                 <div className="mx-auto mb-3 size-12 rounded-full bg-primary/10 flex items-center justify-center">
                     <span className="material-symbols-outlined text-primary">favorite</span>
                 </div>
-                <p className="text-lg font-black text-[#181113]">¡Gracias!</p>
+                <p className="text-lg font-black text-[#181113]">{content.successTitle}</p>
                 <p className="text-sm text-[#89616f] mt-1">
-                    Tu testimonio quedó enviado 💛 <span className="font-semibold">Lo revisamos</span> antes de publicarlo.
+                    {content.successText}
                 </p>
             </div>
         );
@@ -133,25 +138,24 @@ function ReviewForm({ onSent }: { onSent: () => void }) {
         <div className="rounded-2xl border border-primary/10 bg-white p-6 md:p-8 shadow-sm">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h3 className="text-2xl font-black text-[#181113]">Deja tu testimonio</h3>
+                    <h3 className="text-2xl font-black text-[#181113]">{content.title}</h3>
                     <p className="text-sm text-[#89616f] mt-1">
-                        Nos ayuda muchísimo. En la página mostramos <span className="font-bold">máximo 3</span>.
+                        {content.subtitle}
                     </p>
                 </div>
 
                 <span className="hidden md:inline-flex text-[11px] font-bold px-3 py-1 rounded-full bg-primary/10 text-primary shrink-0">
-                    1 minuto
+                    {content.timeBadge}
                 </span>
             </div>
 
             {/* Campos */}
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-xs font-bold text-[#89616f] mb-2">Tu nombre</label>
-                    <input
+                    <label className="block text-xs font-bold text-[#89616f] mb-2">{content.nameLabel}</label>                    <input
                         className="w-full rounded-2xl border border-[#f4f0f2] bg-[#fdfafb] px-4 py-3 text-sm
                        focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary"
-                        placeholder="Ej: Martina"
+                        placeholder={content.namePlaceholder}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         autoComplete="name"
@@ -159,11 +163,11 @@ function ReviewForm({ onSent }: { onSent: () => void }) {
                 </div>
 
                 <div>
-                    <label className="block text-xs font-bold text-[#89616f] mb-2">Comuna</label>
+                    <label className="block text-xs font-bold text-[#89616f] mb-2">{content.comunaLabel}</label>
                     <input
                         className="w-full rounded-2xl border border-[#f4f0f2] bg-[#fdfafb] px-4 py-3 text-sm
                        focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary"
-                        placeholder="Ej: San Bernardo"
+                        placeholder={content.comunaPlaceholder}
                         value={comuna}
                         onChange={(e) => setComuna(e.target.value)}
                         autoComplete="address-level2"
@@ -173,7 +177,7 @@ function ReviewForm({ onSent }: { onSent: () => void }) {
 
             {/* Estrellas */}
             <div className="mt-5">
-                <label className="block text-xs font-bold text-[#89616f] mb-2">Calificación</label>
+                <label className="block text-xs font-bold text-[#89616f] mb-2">{content.starsLabel}</label>
 
                 <div className="flex items-center gap-2 flex-wrap">
                     {Array.from({ length: 5 }).map((_, i) => {
@@ -207,18 +211,18 @@ function ReviewForm({ onSent }: { onSent: () => void }) {
 
             {/* Comentario */}
             <div className="mt-5">
-                <label className="block text-xs font-bold text-[#89616f] mb-2">¿Cómo fue tu experiencia?</label>
+                <label className="block text-xs font-bold text-[#89616f] mb-2">{content.textLabel}</label>
                 <textarea
                     className="w-full rounded-2xl border border-[#f4f0f2] bg-[#fdfafb] px-4 py-3 text-sm
                      focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary"
                     rows={4}
-                    placeholder="Cuéntanos en 1–2 frases cómo te fue 😊"
+                    placeholder={content.textPlaceholder}
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                 />
                 <div className="mt-2 flex items-center justify-between">
                     <p className="text-xs text-[#89616f]">
-                        Por seguridad, los testimonios se revisan antes de publicarse.
+                        {content.moderationNote}
                     </p>
                     <p className="text-xs text-[#89616f]">{Math.min(text.length, 240)} / 240</p>
                 </div>
@@ -241,12 +245,12 @@ function ReviewForm({ onSent }: { onSent: () => void }) {
                 className="mt-6 w-full rounded-full bg-primary text-white font-black py-4 shadow-lg shadow-primary/20
                    hover:bg-primary/90 active:scale-[0.99] transition disabled:opacity-50"
             >
-                {sending ? "Enviando..." : "Enviar testimonio"}
+                {sending ? content.submitSending : content.submit}
             </button>
 
             {!canSend ? (
                 <p className="mt-3 text-xs text-[#89616f] text-center">
-                    Tip: escribe tu nombre y un comentario un poquito más largo para habilitar el envío.
+                    {content.helper}
                 </p>
             ) : null}
         </div>
@@ -266,25 +270,27 @@ function Stars({ n }: { n: number }) {
 function TestimonialsSection({
     loading,
     testimonials,
+    content,
 }: {
     loading: boolean;
     testimonials: Testimonial[];
+    content: LandingContent["testimonials"];
 }) {
     return (
         <section className="px-6 lg:px-40 py-16 bg-white">
             <div className="max-w-[900px] mx-auto">
                 <div className="text-center mb-10">
-                    <h2 className="text-3xl font-bold mb-3">Testimonios</h2>
-                    <p className="text-[#89616f]">Mostramos máximo 3, elegidos y revisados.</p>
+                    <h2 className="text-3xl font-bold mb-3">{content.title}</h2>
+                    <p className="text-[#89616f]">{content.intro}</p>
                 </div>
 
                 {loading ? (
                     <div className="rounded-2xl border border-primary/10 bg-background-light p-10 text-center">
-                        <p className="text-[#89616f]">Cargando testimonios…</p>
+                        <p className="text-[#89616f]">{content.loadingText}</p>
                     </div>
                 ) : testimonials.length === 0 ? (
                     <div className="rounded-2xl border border-primary/10 bg-background-light p-10 text-center">
-                        <p className="text-[#89616f]">Todavía no hay testimonios publicados ✨</p>
+                        <p className="text-[#89616f]">{content.emptyText}</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -387,7 +393,6 @@ export default function LandingClient() {
     const [openPhoto, setOpenPhoto] = useState(false);
     const [activePhotoIndex, setActivePhotoIndex] = useState<number>(0);
     const [zoom, setZoom] = useState(false);
-    const waHref = waLink(WA_PHONE, buildWhatsAppText(selectedService));
 
     const photos = gallery
         .filter((x) => x.mediaType !== "video")
@@ -418,6 +423,25 @@ export default function LandingClient() {
 
     const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
     const [loadingTestimonials, setLoadingTestimonials] = useState(true);
+    const [content, setContent] = useState<LandingContent | null>(null);
+    const safeContent = content ?? defaultLandingContent;
+    const processIcons = [
+        "chat_bubble",
+        "calendar_month",
+        "home",
+        "face_retouching_natural",
+    ];
+    const waHref = waLink(
+        safeContent.footer.whatsappPhone,
+        buildWhatsAppText(selectedService)
+    );
+
+    useEffect(() => {
+        fetch("/api/content", { cache: "no-store" })
+            .then((r) => r.json())
+            .then((d) => setContent(d.content))
+            .catch(() => setContent(null))
+    }, []);
 
     useEffect(() => {
         refreshTestimonials();
@@ -502,8 +526,8 @@ export default function LandingClient() {
             <Modal
                 open={open}
                 onClose={() => setOpen(false)}
-                title="Cotizar por WhatsApp"
-                subtitle="Respuesta rápida, sin vueltas."
+                title={safeContent.modals.whatsappTitle}
+                subtitle={safeContent.modals.whatsappSubtitle}
                 icon="chat"
             >
                 <WhatsAppLeadForm initialService={selectedService} onSent={() => setOpen(false)} />
@@ -512,8 +536,8 @@ export default function LandingClient() {
             <Modal
                 open={openReel}
                 onClose={() => { setOpenReel(false); setActiveReel(null); }}
-                title="Reel / Video"
-                subtitle="Toca play y súbele el volumen."
+                title={safeContent.modals.reelTitle}
+                subtitle={safeContent.modals.reelSubtitle}
                 icon="play_circle"
             >
                 {activeReel ? (
@@ -533,7 +557,7 @@ export default function LandingClient() {
             <Modal
                 open={openPhoto}
                 onClose={closePhoto}
-                title="Foto"
+                title={safeContent.modals.photoTitle}
                 subtitle={`${activePhotoIndex + 1} / ${photos.length}`}
                 icon="photo"
             >
@@ -586,7 +610,7 @@ export default function LandingClient() {
                         </div>
 
                         <p className="text-xs text-[#89616f] text-center">
-                            Tip: flechas del teclado para navegar. Click en la foto para zoom.
+                            {safeContent.gallery.modalTip}
                         </p>
                     </div>
                 ) : null}
@@ -601,7 +625,7 @@ export default function LandingClient() {
                             <span className="material-symbols-outlined text-3xl">auto_awesome</span>
                         </div>
                         <span className="text-[#181113] text-xl font-extrabold leading-tight tracking-tight font-display">
-                            Caroline Trenzas
+                            {safeContent.header.brand}
                         </span>
                     </a>
 
@@ -611,13 +635,13 @@ export default function LandingClient() {
                             className="hidden md:flex items-center gap-2 text-sm font-semibold text-[#89616f] hover:text-primary transition-colors px-4"
                             href="#servicios"
                         >
-                            Servicios
+                            {safeContent.header.navServices}
                         </a>
                         <a
                             className="hidden md:flex items-center gap-2 text-sm font-semibold text-[#89616f] hover:text-primary transition-colors px-4"
                             href="#galeria"
                         >
-                            Galería
+                            {safeContent.header.navGallery}
                         </a>
 
                         <button
@@ -625,7 +649,7 @@ export default function LandingClient() {
                             className="flex min-w-[140px] cursor-pointer items-center justify-center rounded-full h-11 px-6 bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
                             type="button"
                         >
-                            <span>Cotizar por WhatsApp</span>
+                            <span>{safeContent.header.cta}</span>
                         </button>
                     </div>
                 </div>
@@ -636,25 +660,25 @@ export default function LandingClient() {
                 <section className="px-6 lg:px-40 py-10">
                     <div className="relative w-full min-h-[500px] lg:min-h-[600px] rounded-[48px] overflow-hidden">
                         <Image
-                            src="/hero.jpg"
-                            alt="Caroline Trenzas"
+                            src={safeContent.hero.imageSrc || "/hero.jpg"}
+                            alt={safeContent.hero.imageAlt || "Caroline Trenzas"}
                             fill
                             priority
                             className="object-cover"
-                            style={{ objectPosition: "60% 35%" }}
+                            style={{ objectPosition: safeContent.hero.imagePosition || "60% 35%" }}
                         />
                         <div className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/35 to-black/15" />
 
                         <div className="relative z-10 flex min-h-[500px] lg:min-h-[600px] items-center p-8 lg:p-20">
                             <div className="max-w-2xl text-white space-y-6">
                                 <span className="inline-block bg-primary/90 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest">
-                                    Servicio Profesional
+                                    {safeContent.hero.badge}
                                 </span>
                                 <h1 className="text-4xl lg:text-6xl font-black leading-tight tracking-tight">
-                                    Trenzas a domicilio en San Bernardo
+                                    {safeContent.hero.title}
                                 </h1>
                                 <p className="text-lg lg:text-xl font-medium opacity-90">
-                                    Fines de semana disponibles. Luce un estilo único y duradero sin salir de casa.
+                                    {safeContent.hero.subtitle}
                                 </p>
 
                                 <div className="flex flex-wrap gap-4 pt-4">
@@ -663,14 +687,14 @@ export default function LandingClient() {
                                         className="flex items-center justify-center rounded-full h-14 px-8 bg-primary text-white text-base font-bold shadow-xl md:hover:scale-105 transition-transform"
                                         type="button"
                                     >
-                                        Cotizar por WhatsApp
+                                        {safeContent.hero.primaryCta}
                                     </button>
 
                                     <a
                                         className="flex items-center justify-center rounded-full h-14 px-8 bg-white/20 backdrop-blur-sm text-white text-base font-bold border border-white/30 hover:bg-white/30 transition-all"
                                         href="#galeria"
                                     >
-                                        Ver trabajos
+                                        {safeContent.hero.secondaryCta}
                                     </a>
                                 </div>
                             </div>
@@ -682,11 +706,10 @@ export default function LandingClient() {
                 <section id="servicios" className="scroll-mt-24 px-6 lg:px-40 py-20 bg-white">
                     <div className="max-w-[1200px] mx-auto">
                         <div className="text-center mb-16 space-y-4">
-                            <h2 className="text-3xl lg:text-4xl font-bold text-[#181113]">Nuestros Servicios</h2>
+                            <h2 className="text-3xl lg:text-4xl font-bold text-[#181113]">{safeContent.services.title}</h2>
                             <div className="h-1.5 w-20 bg-primary mx-auto rounded-full"></div>
                             <p className="text-[#89616f] max-w-xl mx-auto">
-                                Elegancia y técnica en cada tejido. Selecciona el estilo que mejor se adapte a tu
-                                personalidad.
+                                {safeContent.services.intro}
                             </p>
 
                         </div>
@@ -707,7 +730,7 @@ export default function LandingClient() {
                                         />
                                     ) : (
                                         <div className="w-full aspect-square rounded-lg mb-6 bg-white/60 border border-primary/10 flex items-center justify-center text-sm text-[#89616f]">
-                                            Pronto subimos fotos reales ✨
+                                            {safeContent.services.missingImageText}
                                         </div>
                                     )}
 
@@ -733,7 +756,7 @@ export default function LandingClient() {
                                         className="mt-auto pt-5 w-full"
                                     >
                                         <div className="w-full rounded-full h-11 bg-primary text-white text-sm font-bold hover:bg-primary/90 flex items-center justify-center">
-                                            Cotizar {s.title}
+                                            {safeContent.services.quotePrefix} {s.title}
                                         </div>
                                     </button>
                                 </div>
@@ -742,7 +765,7 @@ export default function LandingClient() {
 
                         {services.length === 0 && (
                             <div className="mt-10 rounded-xl border border-primary/10 bg-background-light p-10 text-center">
-                                <p className="text-[#89616f]">Estamos preparando el catálogo de servicios.</p>
+                                <p className="text-[#89616f]">{safeContent.services.emptyText}</p>
                             </div>
                         )}
                     </div>
@@ -751,18 +774,18 @@ export default function LandingClient() {
                 <section id="antes-despues" className="scroll-mt-24 px-6 lg:px-40 py-20 bg-white">
                     <div className="max-w-[1200px] mx-auto">
                         <div className="text-center mb-12 space-y-3">
-                            <h2 className="text-3xl lg:text-4xl font-bold text-[#181113]">Antes y Después</h2>
+                            <h2 className="text-3xl lg:text-4xl font-bold text-[#181113]">{safeContent.beforeAfter.title}</h2>
                             <div className="h-1.5 w-20 bg-primary mx-auto rounded-full" />
-                            <p className="text-[#89616f]">Cambios reales. Sin promesas raras.</p>
+                            <p className="text-[#89616f]">{safeContent.beforeAfter.intro}</p>
                         </div>
 
                         {loadingBA ? (
                             <div className="rounded-2xl border border-primary/10 bg-background-light p-10 text-center">
-                                <p className="text-[#89616f]">Cargando Antes y Después…</p>
+                                <p className="text-[#89616f]">{safeContent.beforeAfter.loadingText}</p>
                             </div>
                         ) : beforeAfter.length === 0 ? (
                             <div className="rounded-2xl border border-primary/10 bg-background-light p-10 text-center">
-                                <p className="text-[#89616f]">Pronto subiremos Antes y Después reales ✨</p>
+                                <p className="text-[#89616f]">{safeContent.beforeAfter.emptyText}</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -782,7 +805,7 @@ export default function LandingClient() {
                                             <div className="flex items-start justify-between gap-3 mb-4">
                                                 <p className="text-lg font-bold text-[#181113] line-clamp-2">{it.title}</p>
                                                 <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-primary/10 text-primary shrink-0">
-                                                    Antes / Después
+                                                    {safeContent.beforeAfter.cardBadge}
                                                 </span>
                                             </div>
 
@@ -800,12 +823,12 @@ export default function LandingClient() {
                                                             />
                                                         ) : (
                                                             <div className="absolute inset-0 flex items-center justify-center px-3 text-center text-xs font-semibold text-[#89616f]">
-                                                                Pronto subimos fotos reales ✨
+                                                                {safeContent.beforeAfter.missingImageText}
                                                             </div>
                                                         )}
 
                                                         <span className="absolute left-2 top-2 rounded-full bg-white/90 backdrop-blur px-3 py-1 text-[11px] font-extrabold text-[#181113]">
-                                                            ANTES
+                                                            {safeContent.beforeAfter.beforeLabel}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -823,19 +846,19 @@ export default function LandingClient() {
                                                             />
                                                         ) : (
                                                             <div className="absolute inset-0 flex items-center justify-center px-3 text-center text-xs font-semibold text-[#89616f]">
-                                                                Pronto subimos fotos reales ✨
+                                                                {safeContent.beforeAfter.missingImageText}
                                                             </div>
                                                         )}
 
                                                         <span className="absolute left-2 top-2 rounded-full bg-white/90 backdrop-blur px-3 py-1 text-[11px] font-extrabold text-[#181113]">
-                                                            DESPUÉS
+                                                            {safeContent.beforeAfter.afterLabel}
                                                         </span>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             <p className="mt-4 text-xs text-[#89616f]">
-                                                Tip: mándanos foto + referencia por WhatsApp y te cotizamos rápido.
+                                                {safeContent.beforeAfter.cardTip}
                                             </p>
                                         </div>
                                     ))}
@@ -843,7 +866,7 @@ export default function LandingClient() {
                         )}
 
                         <p className="text-xs text-[#89616f] mt-10 text-center">
-                            Tip: si quieres un resultado similar, mándanos una foto y una referencia por WhatsApp.
+                            {safeContent.beforeAfter.sectionTip}
                         </p>
                     </div>
                 </section>
@@ -852,71 +875,37 @@ export default function LandingClient() {
                 <section className="px-6 lg:px-40 py-20 bg-background-light">
                     <div className="max-w-[1200px] mx-auto">
                         <h2 className="text-2xl lg:text-3xl font-bold text-[#181113] mb-12 text-center">
-                            Nuestro Proceso
+                            {safeContent.process.title}
                         </h2>
 
                         <div className="flex flex-col md:flex-row items-center justify-between gap-12 relative">
-                            {/* Connector line for desktop */}
                             <div className="hidden md:block absolute top-1/2 left-0 right-0 h-0.5 bg-primary/20 -translate-y-8 z-0" />
 
-                            <div className="flex flex-col items-center text-center space-y-4 z-10 bg-background-light px-4">
-                                <div className="size-16 rounded-full bg-primary text-white flex items-center justify-center shadow-lg">
-                                    <span className="material-symbols-outlined text-3xl">chat_bubble</span>
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-lg">1. Cotiza</h4>
-                                    <p className="text-[#89616f] text-sm max-w-[220px]">
-                                        Escríbenos por WhatsApp con tu idea (y ojalá una foto).
-                                    </p>
+                            {safeContent.process.steps.map((step, i) => (
+                                <div
+                                    key={`${step.title}-${i}`}
+                                    className="flex flex-col items-center text-center space-y-4 z-10 bg-background-light px-4"
+                                >
+                                    <div className="size-16 rounded-full bg-primary text-white flex items-center justify-center shadow-lg">
+                                        <span className="material-symbols-outlined text-3xl">
+                                            {processIcons[i] ?? "task_alt"}
+                                        </span>
+                                    </div>
 
-                                    <ul className="mt-3 text-xs text-[#89616f] space-y-1">
-                                        <li>⏱ Respondemos lo antes posible (máximo 2 horas)</li>
-                                        <li>📷 Qué enviar: foto + largo + idea</li>
-                                        <li>📍 Fecha y comuna</li>
-                                    </ul>
-                                </div>
-                            </div>
+                                    <div>
+                                        <h4 className="font-bold text-lg">{step.title}</h4>
+                                        <p className="text-[#89616f] text-sm max-w-[220px]">{step.text}</p>
 
-                            <div className="flex flex-col items-center text-center space-y-4 z-10 bg-background-light px-4">
-                                <div className="size-16 rounded-full bg-primary text-white flex items-center justify-center shadow-lg">
-                                    <span className="material-symbols-outlined text-3xl">calendar_month</span>
+                                        {step.bullets?.length ? (
+                                            <ul className="mt-3 text-xs text-[#89616f] space-y-1">
+                                                {step.bullets.map((bullet, idx) => (
+                                                    <li key={idx}>{bullet}</li>
+                                                ))}
+                                            </ul>
+                                        ) : null}
+                                    </div>
                                 </div>
-                                <div>
-                                    <h4 className="font-bold text-lg">2. Reserva</h4>
-                                    <p className="text-[#89616f] text-sm max-w-[220px]">
-                                        Te proponemos horario y dejamos tu cupo confirmado.
-                                    </p>
-
-                                    <ul className="mt-3 text-xs text-[#89616f] space-y-1">
-                                        <li>💳 Abono para reservar</li>
-                                        <li>✅ Confirmación por WhatsApp</li>
-                                    </ul>
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col items-center text-center space-y-4 z-10 bg-background-light px-4">
-                                <div className="size-16 rounded-full bg-primary text-white flex items-center justify-center shadow-lg">
-                                    <span className="material-symbols-outlined text-3xl">home</span>
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-lg">3. Visita</h4>
-                                    <p className="text-[#89616f] text-sm max-w-[200px]">
-                                        Llegamos a tu domicilio con todo lo necesario.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col items-center text-center space-y-4 z-10 bg-background-light px-4">
-                                <div className="size-16 rounded-full bg-primary text-white flex items-center justify-center shadow-lg">
-                                    <span className="material-symbols-outlined text-3xl">face_retouching_natural</span>
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-lg">4. ¡Lista!</h4>
-                                    <p className="text-[#89616f] text-sm max-w-[200px]">
-                                        Disfruta de tus trenzas con un acabado profesional.
-                                    </p>
-                                </div>
-                            </div>
+                            ))}
                         </div>
                     </div>
                 </section>
@@ -927,31 +916,24 @@ export default function LandingClient() {
                         <div className="flex-1 space-y-6">
                             <div className="inline-flex items-center gap-2 text-primary font-bold">
                                 <span className="material-symbols-outlined">location_on</span>
-                                <span>Cobertura Exclusiva</span>
+                                <span>{safeContent.coverage.badge}</span>
                             </div>
-                            <h2 className="text-3xl lg:text-4xl font-bold">Servicio en San Bernardo</h2>
+                            <h2 className="text-3xl lg:text-4xl font-bold">{safeContent.coverage.title}</h2>
                             {/* Coberturas */}
                             <div className="rounded-2xl border border-primary/10 bg-background-light p-5">
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex items-center gap-2">
                                         <span className="material-symbols-outlined text-primary text-xl">location_on</span>
-                                        <p className="font-black text-[#181113]">Cubrimos</p>
+                                        <p className="font-black text-[#181113]">{safeContent.coverage.coveredLabel}</p>
                                     </div>
 
                                     <span className="shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary">
-                                        San Bernardo
+                                        {safeContent.coverage.zoneBadge}
                                     </span>
                                 </div>
 
                                 <div className="mt-4 grid grid-cols-2 gap-2">
-                                    {[
-                                        "San Bernardo Centro",
-                                        "Nos",
-                                        "Lo Herrera",
-                                        "La Vara",
-                                        "El Mariscal",
-                                        "Sector Hospital",
-                                    ].map((x) => (
+                                    {safeContent.coverage.zones.map((x) => (
                                         <div
                                             key={x}
                                             className="flex items-center gap-2 rounded-xl border border-primary/10 bg-white px-3 py-2"
@@ -966,41 +948,33 @@ export default function LandingClient() {
 
                                 <div className="mt-4 rounded-xl border border-primary/10 bg-white px-4 py-3">
                                     <p className="text-xs text-[#89616f]">
-                                        Si estás cerca y no apareces aquí, pregunta igual por WhatsApp.
+                                        {safeContent.coverage.nearbyText}
                                     </p>
                                 </div>
                             </div>
                             <p className="text-[#89616f] text-lg leading-relaxed">
-                                Entendemos que tu tiempo es valioso. Por eso, llevamos el salón de belleza a la
-                                comodidad de tu hogar. Cubrimos todos los sectores de San Bernardo sin costo de
-                                traslado adicional.
+                                {safeContent.coverage.description}
                             </p>
 
                             <ul className="space-y-3">
-                                <li className="flex items-center gap-3 text-[#181113] font-medium">
-                                    <span className="material-symbols-outlined text-primary text-xl">check_circle</span>
-                                    Puntualidad garantizada
-                                </li>
-                                <li className="flex items-center gap-3 text-[#181113] font-medium">
-                                    <span className="material-symbols-outlined text-primary text-xl">check_circle</span>
-                                    Higiene y materiales de calidad
-                                </li>
-                                <li className="flex items-center gap-3 text-[#181113] font-medium">
-                                    <span className="material-symbols-outlined text-primary text-xl">check_circle</span>
-                                    Atención personalizada
-                                </li>
+                                {safeContent.coverage.benefits.map((benefit, i) => (
+                                    <li key={`${benefit}-${i}`} className="flex items-center gap-3 text-[#181113] font-medium">
+                                        <span className="material-symbols-outlined text-primary text-xl">check_circle</span>
+                                        {benefit}
+                                    </li>
+                                ))}
                             </ul>
                         </div>
 
                         <div className="flex-1 w-full max-w-md lg:max-w-none">
                             <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-white shadow-sm aspect-square">
                                 <a
-                                    href="https://www.google.com/maps?q=San%20Bernardo%2C%20Chile"
+                                    href={safeContent.coverage.mapHref}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="absolute right-4 top-4 z-10 rounded-full bg-white/90 px-4 py-2 text-sm font-bold text-[#181113] shadow hover:bg-white"
                                 >
-                                    Ver en Google Maps
+                                    {safeContent.coverage.mapButton}
                                 </a>
 
                                 <iframe
@@ -1008,7 +982,7 @@ export default function LandingClient() {
                                     className="absolute inset-0 h-full w-full"
                                     loading="lazy"
                                     referrerPolicy="no-referrer-when-downgrade"
-                                    src="https://www.google.com/maps?q=San%20Bernardo%2C%20Chile&z=13&output=embed"
+                                    src={safeContent.coverage.mapEmbedSrc}
                                 />
                                 {/* capa sutil para que combine con el diseño */}
                                 <div className="pointer-events-none absolute inset-0 bg-primary/5" />
@@ -1023,60 +997,46 @@ export default function LandingClient() {
                     <div className="max-w-3xl mx-auto bg-white p-8 lg:p-12 rounded-xl border border-primary/10 shadow-sm">
                         <h2 className="text-2xl font-bold mb-8 flex items-center gap-3">
                             <span className="material-symbols-outlined text-primary">info</span>
-                            Nuestras Políticas
+                            {safeContent.policies.title}
                         </h2>
 
                         <div className="space-y-6 text-[#89616f]">
-                            <div className="space-y-2">
-                                <p className="font-bold text-[#181113]">Preparación:</p>
-                                <p className="flex gap-2">
-                                    <span className="text-primary">•</span> El cabello debe estar limpio y desenredado
-                                    antes de la cita.
-                                </p>
-                                <p className="flex gap-2">
-                                    <span className="text-primary">•</span> Recomendamos lavar el cabello el día
-                                    anterior.
-                                </p>
-                            </div>
+                            {safeContent.policies.groups.map((group, i) => (
+                                <div key={`${group.title}-${i}`} className="space-y-2">
+                                    <p className="font-bold text-[#181113]">{group.title}</p>
 
-                            <div className="space-y-2">
-                                <p className="font-bold text-[#181113]">Citas y Cancelaciones:</p>
-                                <p className="flex gap-2">
-                                    <span className="text-primary">•</span> Confirmar con al menos 24 horas de
-                                    anticipación.
-                                </p>
-                                <p className="flex gap-2">
-                                    <span className="text-primary">•</span> Se solicita un abono previo para asegurar
-                                    tu cupo.
-                                </p>
-                            </div>
-
-                            <div className="space-y-2">
-                                <p className="font-bold text-[#181113]">Tiempo Estimado:</p>
-                                <p className="flex gap-2">
-                                    <span className="text-primary">•</span> La duración varía según el diseño (de 1 a
-                                    4 horas).
-                                </p>
-                            </div>
+                                    {group.items.map((item, idx) => (
+                                        <p key={idx} className="flex gap-2">
+                                            <span className="text-primary">•</span> {item}
+                                        </p>
+                                    ))}
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </section>
                 {/* Review Form */}
                 <section className="px-6 lg:px-40 py-16 bg-white">
                     <div className="max-w-[900px] mx-auto">
-                        <ReviewForm onSent={refreshTestimonials} />
+                        <ReviewForm
+                            onSent={refreshTestimonials}
+                            content={safeContent.reviewForm}
+                        />
                     </div>
                 </section>
 
                 {/* Testimonials */}
-                <TestimonialsSection loading={loadingTestimonials} testimonials={testimonials} />
-
+                <TestimonialsSection
+                    loading={loadingTestimonials}
+                    testimonials={testimonials}
+                    content={safeContent.testimonials}
+                />
                 {/* Gallery Section */}
                 <section id="galeria" className="scroll-mt-24 px-6 lg:px-40 py-20 bg-white">
                     <div className="max-w-[1200px] mx-auto">
                         <div className="text-center mb-12">
-                            <h2 className="text-3xl font-bold mb-4">Galería de Trabajos</h2>
-                            <p className="text-[#89616f]">Resultados reales de nuestras clientas satisfechas.</p>
+                            <h2 className="text-3xl font-bold mb-4">{safeContent.gallery.title}</h2>
+                            <p className="text-[#89616f]">{safeContent.gallery.intro}</p>
                         </div>
 
                         {/* --- REELS / VIDEOS DESTACADOS --- */}
@@ -1084,10 +1044,8 @@ export default function LandingClient() {
                             <div className="mb-14">
                                 <div className="flex items-end justify-between gap-3 mb-5">
                                     <div>
-                                        <h3 className="text-xl font-black text-[#181113]">Reels / Videos</h3>
-                                        <p className="text-sm text-[#89616f]">
-                                            Clips cortos desde Instagram (con marca de agua).
-                                        </p>
+                                        <h3 className="text-xl font-black text-[#181113]">{safeContent.gallery.reelsTitle}</h3>
+                                        <p className="text-sm text-[#89616f]">{safeContent.gallery.reelsIntro}</p>
                                     </div>
                                     <span className="text-xs font-bold text-[#89616f]">{reels.length} videos</span>
                                 </div>
@@ -1144,7 +1102,7 @@ export default function LandingClient() {
 
                                                 {/* Pie limpio, sin filenames */}
                                                 <div className="px-4 py-3 flex items-center justify-between">
-                                                    <p className="text-xs text-[#89616f]">Toca para ver con sonido</p>
+                                                    <p className="text-xs text-[#89616f]">{safeContent.gallery.reelsTapText}</p>
                                                     <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-black/80 text-white">
                                                         VIDEO
                                                     </span>
@@ -1159,18 +1117,17 @@ export default function LandingClient() {
                         {/* --- GALERÍA (SOLO FOTOS) --- */}
                         {loadingGallery ? (
                             <div className="rounded-xl border border-primary/10 bg-background-light p-10 text-center">
-                                <p className="text-[#89616f]">Cargando galería…</p>
-                            </div>
+                                <p className="text-[#89616f]">{safeContent.gallery.loadingText}</p>                            </div>
                         ) : photos.length === 0 ? (
                             <div className="rounded-xl border border-primary/10 bg-background-light p-10 text-center">
-                                <p className="text-[#89616f]">Pronto subiremos fotos reales de nuestros trabajos.</p>
+                                <p className="text-[#89616f]">{safeContent.gallery.emptyText}</p>
                             </div>
                         ) : (
                             <div>
                                 <div className="flex items-end justify-between gap-3 mb-5">
                                     <div>
-                                        <h3 className="text-xl font-black text-[#181113]">Galería de fotos</h3>
-                                        <p className="text-sm text-[#89616f]">Algunos resultados reales (sin filtros raros).</p>
+                                        <h3 className="text-xl font-black text-[#181113]">{safeContent.gallery.photosTitle}</h3>
+                                        <p className="text-sm text-[#89616f]">{safeContent.gallery.photosIntro}</p>
                                     </div>
                                     <span className="text-xs font-bold text-[#89616f]">
                                         {Math.min(visiblePhotos, photos.length)} / {photos.length}
@@ -1190,7 +1147,7 @@ export default function LandingClient() {
                                             >
                                                 <Image
                                                     src={item.src}
-                                                    alt={item.alt || "Trabajo de trenzas"}
+                                                    alt={safeContent.gallery.defaultImageAlt}
                                                     width={item.width || 1200}
                                                     height={item.height || 1600}
                                                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
@@ -1210,7 +1167,7 @@ export default function LandingClient() {
                                             onClick={() => setVisiblePhotos((v) => v + 10)}
                                             className="h-12 px-7 rounded-full bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 active:scale-[0.99] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                                         >
-                                            Cargar más fotos
+                                            {safeContent.gallery.loadMore}
                                         </button>
 
                                         <p className="text-xs text-[#89616f]">
@@ -1219,7 +1176,7 @@ export default function LandingClient() {
                                     </div>
                                 ) : (
                                     <div className="mt-10 text-center text-xs text-[#89616f]">
-                                        Eso es todo. Si quieres más, toca el botón de WhatsApp y te mandan el IG 😄
+                                        {safeContent.gallery.allLoadedText}
                                     </div>
                                 )}
                             </div>
@@ -1229,17 +1186,10 @@ export default function LandingClient() {
                 <section className="px-6 lg:px-40 py-20 bg-white">
                     <div className="max-w-[900px] mx-auto">
                         <div className="text-center mb-10">
-                            <h2 className="text-3xl font-bold mb-3">Preguntas frecuentes</h2>
+                            <h2 className="text-3xl font-bold mb-3">{safeContent.faq.title}</h2>
                         </div>
 
-                        <FAQAccordion
-                            items={[
-                                { q: "¿Cuánto dura el servicio?", a: "Depende del diseño y el largo. En general entre 1 y 4 horas. Te confirmamos al cotizar." },
-                                { q: "¿Se pide abono para reservar?", a: "Sí. El abono asegura tu cupo y se descuenta del total el día del servicio." },
-                                { q: "¿Qué debo enviar por WhatsApp?", a: "Ideal: foto de tu pelo, largo (o foto), referencia del estilo, fecha y comuna." },
-                                { q: "¿Qué sectores cubres?", a: "San Bernardo (centro) y sectores cercanos. Si estás cerca, pregunta igual por WhatsApp." },
-                            ]}
-                        />
+                        <FAQAccordion items={safeContent.faq.items} />
                     </div>
                 </section>
 
@@ -1253,38 +1203,37 @@ export default function LandingClient() {
                             <div className="text-primary">
                                 <span className="material-symbols-outlined text-3xl">auto_awesome</span>
                             </div>
-                            <h2 className="text-xl font-extrabold font-display">Caroline Trenzas</h2>
+                            <h2 className="text-xl font-extrabold font-display">{safeContent.footer.brand}</h2>
                         </div>
                         <p className="text-white/60 text-sm leading-relaxed max-w-xs">
-                            Especialista en trenzas y peinados profesionales a domicilio. Llevamos el estilo y la
-                            elegancia a tu hogar en San Bernardo.
+                            {safeContent.footer.description}
                         </p>
                     </div>
 
                     <div className="space-y-6">
-                        <h3 className="text-lg font-bold">Contacto</h3>
+                        <h3 className="text-lg font-bold">{safeContent.footer.contactTitle}</h3>
                         <div className="space-y-4">
                             <div className="flex items-center gap-3 text-white/80">
                                 <span className="material-symbols-outlined text-primary">call</span>
-                                <span>+56 9 7401 1961</span>
+                                <span>{safeContent.footer.phone}</span>
                             </div>
                             <div className="flex items-center gap-3 text-white/80">
                                 <span className="material-symbols-outlined text-primary">location_on</span>
-                                <span>San Bernardo, Región Metropolitana</span>
+                                <span>{safeContent.footer.location}</span>
                             </div>
                             <div className="flex items-center gap-3 text-white/80">
                                 <span className="material-symbols-outlined text-primary">schedule</span>
-                                <span>Sábados y Domingos: 09:00 - 19:00</span>
+                                <span>{safeContent.footer.schedule}</span>
                             </div>
                         </div>
                     </div>
 
                     <div className="space-y-6">
-                        <h3 className="text-lg font-bold">Síguenos</h3>
+                        <h3 className="text-lg font-bold">{safeContent.footer.socialTitle}</h3>
                         <div className="flex gap-4">
                             <a
                                 className="size-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-primary transition-colors"
-                                href="https://www.instagram.com/caroline_trenzas_/"
+                                href={safeContent.footer.instagramUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 title="Instagram"
@@ -1300,7 +1249,7 @@ export default function LandingClient() {
                 </div>
 
                 <div className="max-w-[1200px] mx-auto border-t border-white/10 mt-12 pt-8 text-center text-white/40 text-sm">
-                    <p>© 2026 Caroline Trenzas. San Bernardo, RM. Todos los derechos reservados.</p>
+                    <p>{safeContent.footer.copyright}</p>
                 </div>
             </footer>
 

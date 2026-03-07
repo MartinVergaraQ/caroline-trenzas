@@ -2,7 +2,14 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
-type NavKey = "dashboard" | "gallery" | "services" | "beforeAfter" | "testimonials" | "settings";
+type NavKey =
+    | "dashboard"
+    | "gallery"
+    | "services"
+    | "beforeAfter"
+    | "testimonials"
+    | "settings"
+    | "content";
 
 const NAV: { key: NavKey; label: string; icon: string }[] = [
     { key: "dashboard", label: "Panel", icon: "dashboard" },
@@ -11,6 +18,7 @@ const NAV: { key: NavKey; label: string; icon: string }[] = [
     { key: "beforeAfter", label: "Antes/Después", icon: "compare" },
     { key: "testimonials", label: "Testimonios", icon: "chat_bubble" },
     { key: "settings", label: "Ajustes", icon: "settings" },
+    { key: "content", label: "Contenido", icon: "edit_note" },
 ];
 
 function clsx(...parts: Array<string | false | null | undefined>) {
