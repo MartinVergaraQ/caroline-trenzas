@@ -60,3 +60,21 @@ git clone https://github.com/MartinVergaraQ/caroline-trenzas.git
 cd caroline-trenzas
 npm install
 npm run dev
+
+# Cloudinary
+CLOUDINARY_CLOUD_NAME=xxx
+CLOUDINARY_API_KEY=xxx
+CLOUDINARY_API_SECRET=xxx
+
+# App
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Auth / WebAuthn (ajusta según tu implementación)
+WEBAUTHN_RP_ID=localhost
+WEBAUTHN_ORIGIN=http://localhost:3000
+
+## 👤 Autor
+
+Martín Vergara Quiroz
+GitHub: https://github.com/MartinVergaraQ
+linkedin: https://www.linkedin.com/in/martin-ignacio-vergara-quiroz-b8042a251/
