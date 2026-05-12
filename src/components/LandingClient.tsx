@@ -58,8 +58,7 @@ function ReviewForm({
     const [done, setDone] = useState(false);
     const SENT_KEY = "ct_testimonial_sent_at";
     const isDev = process.env.NODE_ENV !== "production";
-    const COOLDOWN_MS = isDev ? 10 * 1000 : 12 * 60 * 60 * 1000; // 10s en dev, 12h prod
-    // honeypot invisible
+    const COOLDOWN_MS = isDev ? 10 * 1000 : 12 * 60 * 60 * 1000;
     const [website, setWebsite] = useState("");
 
     const canSend = name.trim().length >= 2 && text.trim().length >= 6 && !sending;
@@ -69,7 +68,6 @@ function ReviewForm({
         try {
             const raw = localStorage.getItem(SENT_KEY);
             if (!raw) return;
-
             const sentAt = Number(raw);
             if (!Number.isFinite(sentAt)) return;
 
@@ -80,7 +78,7 @@ function ReviewForm({
                 localStorage.removeItem(SENT_KEY);
             }
         } catch {
-            // si falla storage, no hacemos drama
+            // ignore
         }
     }, [isDev, COOLDOWN_MS]);
 
@@ -122,141 +120,170 @@ function ReviewForm({
 
     if (done) {
         return (
-            <div className="rounded-2xl border border-primary/10 bg-white p-8 text-center shadow-sm">
-                <div className="mx-auto mb-3 size-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-primary">favorite</span>
+            <div className="overflow-hidden rounded-[26px] border border-primary/10 bg-white shadow-[0_14px_44px_-28px_rgba(236,72,153,0.22)]">
+                <div className="bg-[linear-gradient(180deg,#fff5f9_0%,#ffffff_100%)] px-6 py-8 text-center">
+                    <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-primary/10">
+                        <span className="material-symbols-outlined text-primary">favorite</span>
+                    </div>
+                    <p className="text-xl md:text-2xl font-black tracking-tight text-[#181113]">
+                        {content.successTitle}
+                    </p>
+                    <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[#89616f]">
+                        {content.successText}
+                    </p>
                 </div>
-                <p className="text-lg font-black text-[#181113]">{content.successTitle}</p>
-                <p className="text-sm text-[#89616f] mt-1">
-                    {content.successText}
-                </p>
             </div>
         );
     }
 
     return (
-        <div className="rounded-2xl border border-primary/10 bg-white p-6 md:p-8 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-                <div>
-                    <h3 className="text-2xl font-black text-[#181113]">{content.title}</h3>
-                    <p className="text-sm text-[#89616f] mt-1">
-                        {content.subtitle}
-                    </p>
+        <div className="overflow-hidden rounded-[26px] border border-primary/10 bg-white shadow-[0_14px_44px_-28px_rgba(236,72,153,0.22)]">
+            <div className="border-b border-primary/10 bg-[linear-gradient(180deg,#fff5f9_0%,#ffffff_100%)] px-5 py-5 md:px-6">
+                <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-black text-primary">
+                    <span className="material-symbols-outlined text-[15px]">rate_review</span>
+                    Opinión real
                 </div>
 
-                <span className="hidden md:inline-flex text-[11px] font-bold px-3 py-1 rounded-full bg-primary/10 text-primary shrink-0">
-                    {content.timeBadge}
-                </span>
-            </div>
-
-            {/* Campos */}
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-xs font-bold text-[#89616f] mb-2">{content.nameLabel}</label>                    <input
-                        className="w-full rounded-2xl border border-[#f4f0f2] bg-[#fdfafb] px-4 py-3 text-sm
-                       focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary"
-                        placeholder={content.namePlaceholder}
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        autoComplete="name"
-                    />
-                </div>
-
-                <div>
-                    <label className="block text-xs font-bold text-[#89616f] mb-2">{content.comunaLabel}</label>
-                    <input
-                        className="w-full rounded-2xl border border-[#f4f0f2] bg-[#fdfafb] px-4 py-3 text-sm
-                       focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary"
-                        placeholder={content.comunaPlaceholder}
-                        value={comuna}
-                        onChange={(e) => setComuna(e.target.value)}
-                        autoComplete="address-level2"
-                    />
-                </div>
-            </div>
-
-            {/* Estrellas */}
-            <div className="mt-5">
-                <label className="block text-xs font-bold text-[#89616f] mb-2">{content.starsLabel}</label>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                    {Array.from({ length: 5 }).map((_, i) => {
-                        const n = i + 1;
-                        const active = n <= stars;
-
-                        return (
-                            <button
-                                key={n}
-                                type="button"
-                                onClick={() => setStars(n)}
-                                className={[
-                                    "h-11 px-4 rounded-full border text-sm font-bold transition",
-                                    active
-                                        ? "bg-primary text-white border-primary shadow-sm"
-                                        : "bg-white border-primary/15 text-[#181113] hover:bg-black/5",
-                                ].join(" ")}
-                                aria-label={`${n} estrellas`}
-                            >
-                                <span className={active ? "" : "text-black/30"}>★</span>{" "}
-                                <span className="ml-1">{n}</span>
-                            </button>
-                        );
-                    })}
-
-                    <span className="text-xs text-[#89616f] ml-1">
-                        {stars >= 4 ? "🔥" : stars === 3 ? "🙂" : "🫠"} {stars} / 5
-                    </span>
-                </div>
-            </div>
-
-            {/* Comentario */}
-            <div className="mt-5">
-                <label className="block text-xs font-bold text-[#89616f] mb-2">{content.textLabel}</label>
-                <textarea
-                    className="w-full rounded-2xl border border-[#f4f0f2] bg-[#fdfafb] px-4 py-3 text-sm
-                     focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary"
-                    rows={4}
-                    placeholder={content.textPlaceholder}
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                />
-                <div className="mt-2 flex items-center justify-between">
-                    <p className="text-xs text-[#89616f]">
-                        {content.moderationNote}
-                    </p>
-                    <p className="text-xs text-[#89616f]">{Math.min(text.length, 240)} / 240</p>
-                </div>
-            </div>
-
-            {/* honeypot */}
-            <input
-                value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-                className="hidden"
-                tabIndex={-1}
-                autoComplete="off"
-            />
-
-            {/* CTA */}
-            <button
-                type="button"
-                onClick={submit}
-                disabled={!canSend}
-                className="mt-6 w-full rounded-full bg-primary text-white font-black py-4 shadow-lg shadow-primary/20
-                   hover:bg-primary/90 active:scale-[0.99] transition disabled:opacity-50"
-            >
-                {sending ? content.submitSending : content.submit}
-            </button>
-
-            {!canSend ? (
-                <p className="mt-3 text-xs text-[#89616f] text-center">
-                    {content.helper}
+                <h3 className="mt-3 text-[30px] leading-tight font-black tracking-tight text-[#181113]">
+                    {content.title}
+                </h3>
+                <p className="mt-2 text-sm text-[#89616f]">
+                    {content.subtitle}
                 </p>
-            ) : null}
-        </div>
+            </div>
 
+            <div className="p-5 md:p-6">
+                <div className="mb-5 grid gap-2.5 md:grid-cols-3">
+                    <div className="rounded-2xl border border-primary/10 bg-[#fffafb] px-4 py-2.5">
+                        <p className="text-sm font-black text-[#181113]">1 minuto</p>
+                        <p className="text-xs text-[#89616f]">Deja tu opinión rápido.</p>
+                    </div>
+
+                    <div className="rounded-2xl border border-primary/10 bg-[#fffafb] px-4 py-2.5">
+                        <p className="text-sm font-black text-[#181113]">Revisión previa</p>
+                        <p className="text-xs text-[#89616f]">Se valida antes de publicarse.</p>
+                    </div>
+
+                    <div className="rounded-2xl border border-primary/10 bg-[#fffafb] px-4 py-2.5">
+                        <p className="text-sm font-black text-[#181113]">Máximo 3 visibles</p>
+                        <p className="text-xs text-[#89616f]">Mostramos solo las mejores.</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                        <label className="mb-2 block text-xs font-black uppercase tracking-wider text-[#89616f]">
+                            {content.nameLabel}
+                        </label>
+                        <input
+                            className="w-full rounded-2xl border border-[#f1e6eb] bg-[#fffafb] px-4 py-3 text-sm text-[#181113] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary"
+                            placeholder={content.namePlaceholder}
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            autoComplete="name"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="mb-2 block text-xs font-black uppercase tracking-wider text-[#89616f]">
+                            {content.comunaLabel}
+                        </label>
+                        <input
+                            className="w-full rounded-2xl border border-[#f1e6eb] bg-[#fffafb] px-4 py-3 text-sm text-[#181113] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary"
+                            placeholder={content.comunaPlaceholder}
+                            value={comuna}
+                            onChange={(e) => setComuna(e.target.value)}
+                            autoComplete="address-level2"
+                        />
+                    </div>
+                </div>
+
+                <div className="mt-5">
+                    <label className="mb-2 block text-xs font-black uppercase tracking-wider text-[#89616f]">
+                        {content.starsLabel}
+                    </label>
+
+                    <div className="grid grid-cols-5 gap-2">
+                        {Array.from({ length: 5 }).map((_, i) => {
+                            const n = i + 1;
+                            const active = n <= stars;
+
+                            return (
+                                <button
+                                    key={n}
+                                    type="button"
+                                    onClick={() => setStars(n)}
+                                    aria-label={`${n} estrellas`}
+                                    className={[
+                                        "rounded-2xl border px-2 py-2.5 text-center text-sm font-black transition",
+                                        active
+                                            ? "border-primary bg-primary text-white shadow-lg shadow-primary/20"
+                                            : "border-primary/15 bg-white text-[#181113] hover:bg-primary/5",
+                                    ].join(" ")}
+                                >
+                                    <div className="text-base">★</div>
+                                    <div className="mt-1 text-[11px]">{n}</div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="mt-5">
+                    <label className="mb-2 block text-xs font-black uppercase tracking-wider text-[#89616f]">
+                        {content.textLabel}
+                    </label>
+                    <textarea
+                        className="min-h-[128px] w-full rounded-[22px] border border-[#f1e6eb] bg-[#fffafb] px-4 py-4 text-sm text-[#181113] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary"
+                        rows={4}
+                        placeholder={content.textPlaceholder}
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                    />
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                        <p className="text-xs text-[#89616f]">{content.moderationNote}</p>
+                        <p className="text-xs font-semibold text-[#89616f]">
+                            {Math.min(text.length, 240)} / 240
+                        </p>
+                    </div>
+                </div>
+
+                <input
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    className="hidden"
+                    tabIndex={-1}
+                    autoComplete="off"
+                />
+
+                <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between rounded-[22px] border border-primary/10 bg-[#fff7fa] p-3.5">
+                    <div>
+                        <p className="text-sm font-black text-[#181113]">¿Nos dejas tu experiencia?</p>
+                        <p className="text-xs text-[#89616f]">
+                            Tu comentario ayuda a otras clientas a confiar y elegir mejor.
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={submit}
+                        disabled={!canSend}
+                        className="inline-flex w-full items-center justify-center rounded-full bg-primary px-5 py-3 text-sm font-black text-white shadow-lg shadow-primary/20 transition hover:bg-primary/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
+                    >
+                        {sending ? content.submitSending : content.submit}
+                    </button>
+                </div>
+
+                {!canSend ? (
+                    <p className="mt-3 text-center text-xs text-[#89616f]">
+                        {content.helper}
+                    </p>
+                ) : null}
+            </div>
+        </div>
     );
 }
+
 function Stars({ n }: { n: number }) {
     const full = "★★★★★".slice(0, Math.max(0, Math.min(5, n)));
     const empty = "★★★★★".slice(0, 5 - Math.max(0, Math.min(5, n)));
@@ -264,6 +291,168 @@ function Stars({ n }: { n: number }) {
         <p className="text-yellow-600 text-sm">
             {full} <span className="text-black/10">{empty}</span>
         </p>
+    );
+}
+function PoliciesPremiumSection({
+    content,
+}: {
+    content: LandingContent["policies"];
+}) {
+    const icons = ["spa", "event_busy", "schedule"];
+
+    return (
+        <section className="px-6 lg:px-40 py-14 bg-[linear-gradient(180deg,#fffbfd_0%,#fff7fa_100%)]">
+            <div className="max-w-[1100px] mx-auto">
+                <div className="overflow-hidden rounded-[32px] border border-primary/10 bg-white shadow-[0_24px_80px_-36px_rgba(236,72,153,0.24)]">
+                    <div className="border-b border-primary/10 bg-[linear-gradient(180deg,#fff4f8_0%,#ffffff_100%)] px-6 py-6 md:px-8">
+                        <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-black text-primary">
+                            <span className="material-symbols-outlined text-[15px]">verified_user</span>
+                            Información importante
+                        </div>
+
+                        <h2 className="mt-4 text-3xl font-black tracking-tight text-[#181113]">
+                            {content.title}
+                        </h2>
+
+                        <p className="mt-2 max-w-2xl text-sm text-[#89616f]">
+                            Todo claro antes de reservar: preparación, confirmación y tiempos estimados.
+                        </p>
+                    </div>
+
+                    <div className="grid gap-4 p-6 md:grid-cols-3 md:p-8">
+                        {content.groups.map((group, i) => (
+                            <div
+                                key={`${group.title}-${i}`}
+                                className="rounded-[24px] border border-primary/10 bg-[#fffafb] p-5"
+                            >
+                                <div className="mb-4 flex items-center gap-3">
+                                    <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                                        <span className="material-symbols-outlined">
+                                            {icons[i] ?? "info"}
+                                        </span>
+                                    </div>
+
+                                    <h3 className="text-lg font-black tracking-tight text-[#181113]">
+                                        {group.title}
+                                    </h3>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {group.items.map((item, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="flex items-start gap-3 rounded-2xl bg-white px-4 py-3 border border-primary/10"
+                                        >
+                                            <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                                <span className="material-symbols-outlined text-[14px]">check</span>
+                                            </span>
+                                            <p className="text-sm leading-relaxed text-[#6f5861]">{item}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+function BeforeAfterPremiumCard({
+    item,
+    badge,
+    beforeLabel,
+    afterLabel,
+    missingImageText,
+    onQuote,
+}: {
+    item: BAEntry;
+    badge: string;
+    beforeLabel: string;
+    afterLabel: string;
+    missingImageText: string;
+    onQuote: (service: string) => void;
+}) {
+    return (
+        <article className="group overflow-hidden rounded-[30px] border border-primary/10 bg-white shadow-[0_18px_50px_-28px_rgba(236,72,153,0.24)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_60px_-24px_rgba(236,72,153,0.30)]">
+            <div className="p-5">
+                <div className="mb-4 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <h3 className="text-[30px] leading-tight font-black tracking-tight text-[#181113]">
+                            {item.title}
+                        </h3>
+                        <p className="mt-1 text-sm text-[#89616f]">
+                            Resultado real y acabado prolijo.
+                        </p>
+                    </div>
+
+                    <span className="shrink-0 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-bold text-primary">
+                        {badge}
+                    </span>
+                </div>
+
+                <div className="relative grid grid-cols-2 gap-3">
+                    <div className="relative aspect-[4/5] overflow-hidden rounded-[24px] bg-[#faf7f8]">
+                        {item.before?.src ? (
+                            <Image
+                                src={item.before.src}
+                                alt={`Antes - ${item.title}`}
+                                fill
+                                sizes="(max-width: 768px) 50vw, 25vw"
+                                className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                            />
+                        ) : (
+                            <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-xs font-semibold text-[#89616f]">
+                                {missingImageText}
+                            </div>
+                        )}
+
+                        <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-[#181113] shadow-sm">
+                            {beforeLabel}
+                        </span>
+                    </div>
+
+                    <div className="relative aspect-[4/5] overflow-hidden rounded-[24px] bg-[#faf7f8]">
+                        {item.after?.src ? (
+                            <Image
+                                src={item.after.src}
+                                alt={`Después - ${item.title}`}
+                                fill
+                                sizes="(max-width: 768px) 50vw, 25vw"
+                                className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                            />
+                        ) : (
+                            <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-xs font-semibold text-[#89616f]">
+                                {missingImageText}
+                            </div>
+                        )}
+
+                        <span className="absolute left-3 top-3 rounded-full bg-primary px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-sm">
+                            {afterLabel}
+                        </span>
+                    </div>
+
+                    <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 flex size-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-primary/10 bg-white shadow-md">
+                        <span className="material-symbols-outlined text-primary text-[16px]">
+                            compare_arrows
+                        </span>
+                    </div>
+                </div>
+
+                <p className="mt-4 text-sm leading-relaxed text-[#89616f]">
+                    Envíanos una foto de tu cabello y una referencia para cotizar algo similar.
+                </p>
+
+                <button
+                    type="button"
+                    onClick={() => onQuote(item.title)}
+                    className="mt-5 flex h-12 w-full items-center justify-center rounded-full bg-primary px-6 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-primary/90"
+                >
+                    Cotizar {item.title}
+                </button>
+            </div>
+        </article>
     );
 }
 
@@ -276,46 +465,144 @@ function TestimonialsSection({
     testimonials: Testimonial[];
     content: LandingContent["testimonials"];
 }) {
+    const items = testimonials.slice(0, 3);
+
     return (
-        <section className="px-6 lg:px-40 py-16 bg-white">
-            <div className="max-w-[900px] mx-auto">
-                <div className="text-center mb-10">
-                    <h2 className="text-3xl font-bold mb-3">{content.title}</h2>
-                    <p className="text-[#89616f]">{content.intro}</p>
+        <section className="px-6 lg:px-40 py-8 lg:py-10 bg-white">
+            <div className="max-w-[980px] mx-auto">
+                <div className="mb-7 text-center">
+                    <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-black text-primary">
+                        <span className="material-symbols-outlined text-[15px]">favorite</span>
+                        Opiniones reales
+                    </div>
+
+                    <h2 className="mt-4 text-3xl lg:text-4xl font-black tracking-tight text-[#181113]">
+                        {content.title}
+                    </h2>
+                    <p className="mt-3 text-sm md:text-base text-[#89616f]">
+                        {content.intro}
+                    </p>
                 </div>
 
                 {loading ? (
-                    <div className="rounded-2xl border border-primary/10 bg-background-light p-10 text-center">
+                    <div className="rounded-[26px] border border-primary/10 bg-[#fffafb] p-8 text-center">
                         <p className="text-[#89616f]">{content.loadingText}</p>
                     </div>
-                ) : testimonials.length === 0 ? (
-                    <div className="rounded-2xl border border-primary/10 bg-background-light p-10 text-center">
+                ) : items.length === 0 ? (
+                    <div className="rounded-[26px] border border-primary/10 bg-[#fffafb] p-8 text-center">
                         <p className="text-[#89616f]">{content.emptyText}</p>
                     </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {testimonials.slice(0, 3).map((t) => (
-                            <div
-                                key={t.id}
-                                className="rounded-2xl border border-primary/10 bg-white p-5 shadow-sm"
-                            >
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <p className="font-black text-[#181113] truncate">{t.name}</p>
-                                        <p className="text-xs text-[#89616f]">{t.comuna}</p>
+                ) : items.length === 1 ? (
+                    <div className="mx-auto max-w-[680px]">
+                        <article className="overflow-hidden rounded-[28px] border border-primary/10 bg-white shadow-[0_18px_52px_-30px_rgba(236,72,153,0.24)]">
+                            <div className="border-b border-primary/10 bg-[linear-gradient(180deg,#fff5f9_0%,#ffffff_100%)] p-5 md:p-6">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div>
+                                        <p className="text-lg md:text-xl font-black tracking-tight text-[#181113]">
+                                            {items[0].name}
+                                        </p>
+                                        <p className="mt-1 text-sm text-[#89616f]">{items[0].comuna}</p>
                                     </div>
-                                    <span className="shrink-0 text-[11px] font-bold px-2 py-1 rounded-full bg-primary/10 text-primary">
-                                        {new Date(t.createdAt).toLocaleDateString("es-CL")}
+
+                                    <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-black text-primary">
+                                        {new Date(items[0].createdAt).toLocaleDateString("es-CL")}
                                     </span>
                                 </div>
 
-                                <div className="mt-2">
-                                    <Stars n={t.stars} />
+                                <div className="mt-4">
+                                    <Stars n={items[0].stars} />
                                 </div>
-
-                                <p className="mt-3 text-sm text-[#181113] leading-relaxed">“{t.text}”</p>
                             </div>
+
+                            <div className="p-5 md:p-6">
+                                <span className="material-symbols-outlined mb-3 text-3xl text-primary/20">
+                                    format_quote
+                                </span>
+                                <p className="text-base md:text-lg leading-relaxed text-[#181113]">
+                                    “{items[0].text}”
+                                </p>
+                            </div>
+                        </article>
+                    </div>
+                ) : items.length === 2 ? (
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                        {items.map((t) => (
+                            <article
+                                key={t.id}
+                                className="overflow-hidden rounded-[26px] border border-primary/10 bg-white shadow-[0_16px_42px_-28px_rgba(236,72,153,0.20)]"
+                            >
+                                <div className="p-5">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="truncate text-lg font-black tracking-tight text-[#181113]">
+                                                {t.name}
+                                            </p>
+                                            <p className="text-sm text-[#89616f]">{t.comuna}</p>
+                                        </div>
+
+                                        <span className="shrink-0 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-black text-primary">
+                                            {new Date(t.createdAt).toLocaleDateString("es-CL")}
+                                        </span>
+                                    </div>
+
+                                    <div className="mt-3">
+                                        <Stars n={t.stars} />
+                                    </div>
+
+                                    <p className="mt-4 text-sm leading-relaxed text-[#181113]">
+                                        “{t.text}”
+                                    </p>
+                                </div>
+                            </article>
                         ))}
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.1fr,0.95fr,0.95fr]">
+                        {items.map((t, idx) => {
+                            const featured = idx === 0;
+
+                            return (
+                                <article
+                                    key={t.id}
+                                    className={[
+                                        "overflow-hidden rounded-[26px] border border-primary/10 bg-white",
+                                        featured
+                                            ? "shadow-[0_20px_56px_-28px_rgba(236,72,153,0.24)]"
+                                            : "shadow-sm",
+                                    ].join(" ")}
+                                >
+                                    <div className="p-5">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="truncate text-lg font-black tracking-tight text-[#181113]">
+                                                    {t.name}
+                                                </p>
+                                                <p className="text-sm text-[#89616f]">{t.comuna}</p>
+                                            </div>
+
+                                            <span className="shrink-0 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-black text-primary">
+                                                {new Date(t.createdAt).toLocaleDateString("es-CL")}
+                                            </span>
+                                        </div>
+
+                                        <div className="mt-3">
+                                            <Stars n={t.stars} />
+                                        </div>
+
+                                        <p className={featured ? "mt-4 text-base leading-relaxed text-[#181113]" : "mt-4 text-sm leading-relaxed text-[#181113]"}>
+                                            “{t.text}”
+                                        </p>
+
+                                        {featured ? (
+                                            <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-black text-primary">
+                                                <span className="material-symbols-outlined text-[15px]">verified</span>
+                                                Cliente satisfecha
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </article>
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -714,7 +1001,7 @@ export default function LandingClient() {
 
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {services.map((s) => (
                                 <div
                                     key={s.id}
@@ -771,24 +1058,36 @@ export default function LandingClient() {
                     </div>
                 </section>
                 {/* Before / After */}
-                <section id="antes-despues" className="scroll-mt-24 px-6 lg:px-40 py-20 bg-white">
+                <section
+                    id="antes-despues"
+                    className="scroll-mt-24 px-6 lg:px-40 py-24 bg-[linear-gradient(180deg,#ffffff_0%,#fff7fa_100%)]"
+                >
                     <div className="max-w-[1200px] mx-auto">
-                        <div className="text-center mb-12 space-y-3">
-                            <h2 className="text-3xl lg:text-4xl font-bold text-[#181113]">{safeContent.beforeAfter.title}</h2>
-                            <div className="h-1.5 w-20 bg-primary mx-auto rounded-full" />
-                            <p className="text-[#89616f]">{safeContent.beforeAfter.intro}</p>
+                        <div className="mb-14 text-center">
+                            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-black text-primary">
+                                <span className="material-symbols-outlined text-[15px]">compare</span>
+                                Resultado real
+                            </div>
+
+                            <h2 className="mt-4 text-3xl lg:text-4xl font-black tracking-tight text-[#181113]">
+                                {safeContent.beforeAfter.title}
+                            </h2>
+
+                            <p className="mt-3 max-w-2xl mx-auto text-sm md:text-base text-[#89616f]">
+                                {safeContent.beforeAfter.intro}
+                            </p>
                         </div>
 
                         {loadingBA ? (
-                            <div className="rounded-2xl border border-primary/10 bg-background-light p-10 text-center">
+                            <div className="rounded-[28px] border border-primary/10 bg-white p-10 text-center shadow-sm">
                                 <p className="text-[#89616f]">{safeContent.beforeAfter.loadingText}</p>
                             </div>
                         ) : beforeAfter.length === 0 ? (
-                            <div className="rounded-2xl border border-primary/10 bg-background-light p-10 text-center">
+                            <div className="rounded-[28px] border border-primary/10 bg-white p-10 text-center shadow-sm">
                                 <p className="text-[#89616f]">{safeContent.beforeAfter.emptyText}</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                 {beforeAfter
                                     .slice()
                                     .sort((a, b) => {
@@ -798,75 +1097,24 @@ export default function LandingClient() {
                                     })
                                     .slice(0, 3)
                                     .map((it) => (
-                                        <div
+                                        <BeforeAfterPremiumCard
                                             key={it.serviceId}
-                                            className="group bg-background-light rounded-2xl border border-transparent hover:border-primary/10 hover:shadow-xl transition-all duration-300 p-5"
-                                        >
-                                            <div className="flex items-start justify-between gap-3 mb-4">
-                                                <p className="text-lg font-bold text-[#181113] line-clamp-2">{it.title}</p>
-                                                <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-primary/10 text-primary shrink-0">
-                                                    {safeContent.beforeAfter.cardBadge}
-                                                </span>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-3">
-                                                {/* ANTES */}
-                                                <div className="rounded-2xl overflow-hidden bg-white border border-primary/10">
-                                                    <div className="relative aspect-square bg-black/5">
-                                                        {it.before?.src ? (
-                                                            <Image
-                                                                src={it.before.src}
-                                                                alt={`Antes - ${it.title}`}
-                                                                fill
-                                                                sizes="(max-width: 768px) 50vw, 25vw"
-                                                                className="object-cover"
-                                                            />
-                                                        ) : (
-                                                            <div className="absolute inset-0 flex items-center justify-center px-3 text-center text-xs font-semibold text-[#89616f]">
-                                                                {safeContent.beforeAfter.missingImageText}
-                                                            </div>
-                                                        )}
-
-                                                        <span className="absolute left-2 top-2 rounded-full bg-white/90 backdrop-blur px-3 py-1 text-[11px] font-extrabold text-[#181113]">
-                                                            {safeContent.beforeAfter.beforeLabel}
-                                                        </span>
-                                                    </div>
-                                                </div>
-
-                                                {/* DESPUÉS */}
-                                                <div className="rounded-2xl overflow-hidden bg-white border border-primary/10">
-                                                    <div className="relative aspect-square bg-black/5">
-                                                        {it.after?.src ? (
-                                                            <Image
-                                                                src={it.after.src}
-                                                                alt={`Después - ${it.title}`}
-                                                                fill
-                                                                sizes="(max-width: 768px) 50vw, 25vw"
-                                                                className="object-cover"
-                                                            />
-                                                        ) : (
-                                                            <div className="absolute inset-0 flex items-center justify-center px-3 text-center text-xs font-semibold text-[#89616f]">
-                                                                {safeContent.beforeAfter.missingImageText}
-                                                            </div>
-                                                        )}
-
-                                                        <span className="absolute left-2 top-2 rounded-full bg-white/90 backdrop-blur px-3 py-1 text-[11px] font-extrabold text-[#181113]">
-                                                            {safeContent.beforeAfter.afterLabel}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <p className="mt-4 text-xs text-[#89616f]">
-                                                {safeContent.beforeAfter.cardTip}
-                                            </p>
-                                        </div>
+                                            item={it}
+                                            badge={safeContent.beforeAfter.cardBadge}
+                                            beforeLabel={safeContent.beforeAfter.beforeLabel}
+                                            afterLabel={safeContent.beforeAfter.afterLabel}
+                                            missingImageText={safeContent.beforeAfter.missingImageText}
+                                            onQuote={(service) => {
+                                                setSelectedService(service);
+                                                setOpen(true);
+                                            }}
+                                        />
                                     ))}
                             </div>
                         )}
 
-                        <p className="text-xs text-[#89616f] mt-10 text-center">
-                            {safeContent.beforeAfter.sectionTip}
+                        <p className="mt-8 text-center text-sm text-[#89616f]">
+                            ¿Te gustó algún resultado? Escríbenos por WhatsApp y te orientamos según tu cabello, largo y estilo.
                         </p>
                     </div>
                 </section>
@@ -993,50 +1241,36 @@ export default function LandingClient() {
                 </section>
 
                 {/* Policies Section */}
-                <section className="px-6 lg:px-40 py-16 bg-[#fdfafb]">
-                    <div className="max-w-3xl mx-auto bg-white p-8 lg:p-12 rounded-xl border border-primary/10 shadow-sm">
-                        <h2 className="text-2xl font-bold mb-8 flex items-center gap-3">
-                            <span className="material-symbols-outlined text-primary">info</span>
-                            {safeContent.policies.title}
-                        </h2>
+                <PoliciesPremiumSection content={safeContent.policies} />
 
-                        <div className="space-y-6 text-[#89616f]">
-                            {safeContent.policies.groups.map((group, i) => (
-                                <div key={`${group.title}-${i}`} className="space-y-2">
-                                    <p className="font-bold text-[#181113]">{group.title}</p>
+                <TestimonialsSection
+                    loading={loadingTestimonials}
+                    testimonials={testimonials}
+                    content={safeContent.testimonials}
+                />
 
-                                    {group.items.map((item, idx) => (
-                                        <p key={idx} className="flex gap-2">
-                                            <span className="text-primary">•</span> {item}
-                                        </p>
-                                    ))}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </section>
-                {/* Review Form */}
-                <section className="px-6 lg:px-40 py-16 bg-white">
-                    <div className="max-w-[900px] mx-auto">
+                <section className="px-6 lg:px-40 pt-2 pb-10 bg-white">
+                    <div className="max-w-[860px] mx-auto">
                         <ReviewForm
                             onSent={refreshTestimonials}
                             content={safeContent.reviewForm}
                         />
                     </div>
                 </section>
-
-                {/* Testimonials */}
-                <TestimonialsSection
-                    loading={loadingTestimonials}
-                    testimonials={testimonials}
-                    content={safeContent.testimonials}
-                />
                 {/* Gallery Section */}
-                <section id="galeria" className="scroll-mt-24 px-6 lg:px-40 py-20 bg-white">
+                <section id="galeria" className="scroll-mt-24 px-6 lg:px-40 pt-8 pb-20 bg-white">
                     <div className="max-w-[1200px] mx-auto">
-                        <div className="text-center mb-12">
-                            <h2 className="text-3xl font-bold mb-4">{safeContent.gallery.title}</h2>
-                            <p className="text-[#89616f]">{safeContent.gallery.intro}</p>
+                        <div className="mb-10 flex flex-col items-center text-center">
+                            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-black text-primary">
+                                <span className="material-symbols-outlined text-[15px]">photo_library</span>
+                                Trabajos reales
+                            </div>
+                            <h2 className="mt-4 text-3xl font-black tracking-tight text-[#181113]">
+                                {safeContent.gallery.title}
+                            </h2>
+                            <p className="mt-3 max-w-2xl text-[#89616f]">
+                                {safeContent.gallery.intro}
+                            </p>
                         </div>
 
                         {/* --- REELS / VIDEOS DESTACADOS --- */}
